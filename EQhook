@@ -1,0 +1,85 @@
+import React from 'react';
+import { renderHook } from '@testing-library/react-hooks';
+import { useFetchEarthMovementBarAndAccordionData } from './useFetchEarthMovementBarAndAccordionData';
+import { useSuspenseQuery } from '@apollo/client';
+
+jest.mock('@apollo/client');
+jest.mock('src/common/contexts/AccountContext', () => ({
+  useAccount: () => ({ orgid: 1 }),
+}));
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  useHeader: () => ({ selectedCurrency: 2, asofDate: new Date() }),
+}));
+jest.mock('src/mappers/natHazMappers', () => ({
+  convertDateToJson: (date: Date) => date.toISOString(),
+}));
+
+const mockData = {
+  btp_natural_hazards: {
+    earth_movement_aggregates: {
+      earthquake_frequency_zone_aggregates: [
+        {
+          earthquake_frequency_zone_code: 'Zone 1',
+          active_locations_aggregate: { location_count: 10, total_insured_value: 100000 },
+          prospect_locations_aggregate: { location_count: 5, total_insured_value: 200000 },
+        },
+      ],
+      earthquake_region_aggregates: [
+        {
+          earthquake_region_code: 'Region 1',
+          region_description: 'Description 1',
+          active_locations_aggregate: { location_count: 15, total_insured_value: 300000 },
+          prospect_locations_aggregate: { location_count: 10, total_insured_value: 400000 },
+        },
+      ],
+    },
+  },
+};
+
+describe('useFetchEarthMovementBarAndAccordionData', () => {
+  beforeEach(() => {
+    useSuspenseQuery.mockImplementation(() => ({
+      data: mockData,
+      error: null,
+    }));
+  });
+
+  it('should fetch and return EarthMovementBar and Accordion data', () => {
+    const { result } = renderHook(() => useFetchEarthMovementBarAndAccordionData());
+
+    expect(result.current).toBeDefined();
+    expect(result.current.data).toBeDefined();
+    expect(result.current.data.EarthMovementBarData).toEqual([
+      {
+        zone: 'Zone 1',
+        active_locations: 10,
+        activeTIV: 100000,
+        prospect_locations: 5,
+        prospectTIV: 200000,
+      },
+    ]);
+    expect(result.current.data.EarthMovementAccordionData).toEqual([
+      {
+        region_code: 'Region 1',
+        region_description: 'Description 1',
+        active_location_count: 15,
+        activeTIV: 300000,
+        prospect_location_count: 10,
+        prospectTIV: 400000,
+      },
+    ]);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('should handle errors', () => {
+    useSuspenseQuery.mockImplementationOnce(() => ({
+      data: null,
+      error: new Error('Error fetching data'),
+    }));
+
+    const { result } = renderHook(() => useFetchEarthMovementBarAndAccordionData());
+
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.error).toEqual(new Error('Error fetching data'));
+  });
+});
