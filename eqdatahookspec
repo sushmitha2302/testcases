@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook, waitFor } from '@testing-library/react-hooks';
 import { MockedProvider } from '@apollo/client/testing';
 import { useFetchEarthMovementBarAndAccordionData } from './useFetchEarthMovementBarAndAccordionData';
 import { useAccount } from 'src/common/contexts/AccountContext';
@@ -81,7 +81,7 @@ describe('useFetchEarthMovementBarAndAccordionData', () => {
   });
 
   it('should return EarthMovementBarData and EarthMovementAccordionData correctly', async () => {
-    const { result, waitForNextUpdate } = renderHook(
+    const { result } = renderHook(
       () => useFetchEarthMovementBarAndAccordionData(),
       {
         wrapper: ({ children }) => (
@@ -92,30 +92,30 @@ describe('useFetchEarthMovementBarAndAccordionData', () => {
       }
     );
 
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.EarthMovementBarData).toEqual([
+        {
+          zone: 'zone1',
+          active_locations: 10,
+          activeTIV: 1000,
+          prospect_locations: 20,
+          prospectTIV: 2000,
+        },
+      ]);
 
-    expect(result.current.EarthMovementBarData).toEqual([
-      {
-        zone: 'zone1',
-        active_locations: 10,
-        activeTIV: 1000,
-        prospect_locations: 20,
-        prospectTIV: 2000,
-      },
-    ]);
+      expect(result.current.EarthMovementAccordionData).toEqual([
+        {
+          region_code: 'region1',
+          region_description: 'Region 1',
+          active_location_count: 15,
+          activeTIV: 1500,
+          prospect_location_count: 25,
+          prospectTIV: 2500,
+        },
+      ]);
 
-    expect(result.current.EarthMovementAccordionData).toEqual([
-      {
-        region_code: 'region1',
-        region_description: 'Region 1',
-        active_location_count: 15,
-        activeTIV: 1500,
-        prospect_location_count: 25,
-        prospectTIV: 2500,
-      },
-    ]);
-
-    expect(result.current.error).toBeUndefined();
+      expect(result.current.error).toBeUndefined();
+    });
   });
 
   it('should handle errors', async () => {
@@ -133,7 +133,7 @@ describe('useFetchEarthMovementBarAndAccordionData', () => {
       },
     ];
 
-    const { result, waitForNextUpdate } = renderHook(
+    const { result } = renderHook(
       () => useFetchEarthMovementBarAndAccordionData(),
       {
         wrapper: ({ children }) => (
@@ -144,10 +144,10 @@ describe('useFetchEarthMovementBarAndAccordionData', () => {
       }
     );
 
-    await waitForNextUpdate();
-
-    expect(result.current.error).toBeDefined();
-    expect(result.current.EarthMovementBarData).toBeUndefined();
-    expect(result.current.EarthMovementAccordionData).toBeUndefined();
+    await waitFor(() => {
+      expect(result.current.error).toBeDefined();
+      expect(result.current.EarthMovementBarData).toBeUndefined();
+      expect(result.current.EarthMovementAccordionData).toBeUndefined();
+    });
   });
 });
