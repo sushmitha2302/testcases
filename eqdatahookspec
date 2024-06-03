@@ -137,4 +137,17 @@ describe('useFetchEarthMovementBarAndAccordionData', () => {
       () => useFetchEarthMovementBarAndAccordionData(),
       {
         wrapper: ({ children }) => (
-          <MockedProvider mocks={erro
+          <MockedProvider mocks={errorMocks} addTypename={false}>
+            {children}
+          </MockedProvider>
+        ),
+      }
+    );
+
+    await waitForNextUpdate();
+
+    expect(result.current.error).toBeDefined();
+    expect(result.current.EarthMovementBarData).toBeUndefined();
+    expect(result.current.EarthMovementAccordionData).toBeUndefined();
+  });
+});
