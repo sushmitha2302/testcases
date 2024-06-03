@@ -1,83 +1,63 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
 import CreateEarthMovementBarChart from './EarthMovementBarChart';
-import { BarChart, TableList } from '@btp/shared-ui';
 
-// Mock data
-const mockData = {
-  activezoneData: [
-    { activeTIV: 100, barValue: 50 },
-    { activeTIV: 200, barValue: 100 },
-  ],
-  prospectzoneData: [
-    { prospectTIV: 150, barValue: 75 },
-    { prospectTIV: 250, barValue: 125 },
-  ],
-  earthMovementAggData: {
-    region1: {
-      region_description: 'Region 1',
+// Mock dependencies
+jest.mock('shared-ui/src/lib/HighCharts/BarChart/colorThemes', () => ({
+  ColorThemes: {
+    Prospect: 'ProspectTheme',
+    Active: 'ActiveTheme'
+  }
+}));
+jest.mock('src/mappers/natHazMappers', () => ({
+  formatAmount: (amount: number) => `$${amount.toFixed(2)}`
+}));
+jest.mock('src/NatHazOverview/NatHazOverview.mock', () => ({
+  actionsMock: jest.fn()
+}));
+
+describe('CreateEarthMovementBarChart', () => {
+  const mockResponses = [
+    {
+      zone: 'zone1',
       activeTIV: 100,
-      active_location_count: 2,
-      prospectTIV: 150,
-      prospect_location_count: 3,
+      active_locations: 10,
+      prospectTIV: 200,
+      prospect_locations: 20
     },
-    region2: {
-      region_description: 'Region 2',
-      activeTIV: 200,
-      active_location_count: 4,
-      prospectTIV: 250,
-      prospect_location_count: 5,
-    },
-  },
-};
+    {
+      zone: 'zone2',
+      activeTIV: 300,
+      active_locations: 30,
+      prospectTIV: 400,
+      prospect_locations: 40
+    }
+  ];
 
-describe('EarthMovementBarChart Component', () => {
-  it('should render without crashing', () => {
-    const { getByText } = render(
-      <CreateEarthMovementBarChart 
-        EarthMovementBarData={mockData} 
-        EarthMovementAccordionData={mockData} 
-      />
-    );
-    
-    expect(getByText('Earth Movement')).toBeInTheDocument();
+  it('should calculate TIV correctly', () => {
+    const tiv = calculateTIV(mockResponses, mockResponses[0], 'active');
+    expect(tiv).toBe('33.33');
   });
 
-  it('should calculate total active TIV correctly', () => {
-    const totalActiveTIV = mockData.activezoneData.reduce((sum, data) => sum + data.barValue, 0);
-    expect(totalActiveTIV).toBe(150);
+  it('should render active Earth Movement Bar Chart correctly', () => {
+    render(<CreateEarthMovementBarChart EarthMovementBarData={mockResponses} />);
+    expect(screen.getByText('Earth Movement')).toBeInTheDocument();
+    expect(screen.getByText('Total TIV')).toBeInTheDocument();
   });
 
-  it('should calculate total prospect TIV correctly', () => {
-    const totalProspectTIV = mockData.prospectzoneData.reduce((sum, data) => sum + data.barValue, 0);
-    expect(totalProspectTIV).toBe(200);
+  it('should render prospect Earth Movement Bar Chart correctly', () => {
+    render(<CreateEarthMovementBarChart EarthMovementBarData={mockResponses} />);
+    expect(screen.getByText('Total TIV')).toBeInTheDocument();
+    expect(screen.getByText('$600.00')).toBeInTheDocument(); // Summed total TIV
   });
 
-  it('should render bar charts with correct data', () => {
-    const { getByText } = render(
-      <CreateEarthMovementBarChart 
-        EarthMovementBarData={mockData} 
-        EarthMovementAccordionData={mockData} 
-      />
-    );
-
-    expect(getByText('Total TIV')).toBeInTheDocument();
-    expect(getByText('150')).toBeInTheDocument();
-    expect(getByText('200')).toBeInTheDocument();
+  it('should create region table correctly', () => {
+    render(<CreateEarthMovementBarChart EarthMovementBarData={mockResponses} />);
+    expect(screen.getByText('Earth Movement')).toBeInTheDocument();
+    expect(screen.getByText('Region')).toBeInTheDocument();
+    expect(screen.getByText('TIV')).toBeInTheDocument();
   });
 
-  it('should render region tables with correct data', () => {
-    const { getByText } = render(
-      <CreateEarthMovementBarChart 
-        EarthMovementBarData={mockData} 
-        EarthMovementAccordionData={mockData} 
-      />
-    );
-
-    expect(getByText('Region 1')).toBeInTheDocument();
-    expect(getByText('Region 2')).toBeInTheDocument();
-    expect(getByText('100')).toBeInTheDocument();
-    expect(getByText('200')).toBeInTheDocument();
-  });
+  // Add more tests for each functionality and line of code
 });
