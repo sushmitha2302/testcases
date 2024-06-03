@@ -1,85 +1,96 @@
-import React from 'react';
-import { renderHook } from '@testing-library/react-hooks';
-import { useFetchEarthMovementBarAndAccordionData } from './useFetchEarthMovementBarAndAccordionData';
 import { useSuspenseQuery } from '@apollo/client';
+import { useMemo } from 'react';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import {
+  EarthMovementRegionData,
+  EarthMovementZoneData,
+} from 'src/common/interfaces/interfaces';
+import { convertDateToJson } from 'src/mappers/natHazMappers';
+import {
+  BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+  BtpNaturalHazards_GetEarthMovementAggregates_V01Query,
+} from 'src/models';
 
-jest.mock('@apollo/client');
-jest.mock('src/common/contexts/AccountContext', () => ({
-  useAccount: () => ({ orgid: 1 }),
-}));
-jest.mock('src/common/contexts/HeaderContext', () => ({
-  useHeader: () => ({ selectedCurrency: 2, asofDate: new Date() }),
-}));
-jest.mock('src/mappers/natHazMappers', () => ({
-  convertDateToJson: (date: Date) => date.toISOString(),
-}));
-
-const mockData = {
-  btp_natural_hazards: {
-    earth_movement_aggregates: {
-      earthquake_frequency_zone_aggregates: [
-        {
-          earthquake_frequency_zone_code: 'Zone 1',
-          active_locations_aggregate: { location_count: 10, total_insured_value: 100000 },
-          prospect_locations_aggregate: { location_count: 5, total_insured_value: 200000 },
+const FetchEarthMovementBarAndAccordionDetails = (
+  orgid: number,
+  date: Date | null,
+  selectedCurrency: number | null,
+) => {
+  const { data, error } =
+    useSuspenseQuery<BtpNaturalHazards_GetEarthMovementAggregates_V01Query>(
+      BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+      {
+        variables: {
+          org_prospect_client_id: orgid,
+          as_of_date: convertDateToJson(date),
+          context_currency_type_id: selectedCurrency,
         },
-      ],
-      earthquake_region_aggregates: [
-        {
-          earthquake_region_code: 'Region 1',
-          region_description: 'Description 1',
-          active_locations_aggregate: { location_count: 15, total_insured_value: 300000 },
-          prospect_locations_aggregate: { location_count: 10, total_insured_value: 400000 },
-        },
-      ],
-    },
-  },
+      },
+    );
+  return { data, error };
 };
 
-describe('useFetchEarthMovementBarAndAccordionData', () => {
-  beforeEach(() => {
-    useSuspenseQuery.mockImplementation(() => ({
-      data: mockData,
-      error: null,
-    }));
-  });
+export const useFetchEarthMovementBarAndAccordionData = () => {
+  const { accountDetails } = useAccount();
+  const { selectedCurrency, asofDate } = useHeader();
+  const { orgid } = accountDetails;
+  const { data, error } = FetchEarthMovementBarAndAccordionDetails(
+    +orgid,
+    asofDate,
+    selectedCurrency,
+  );
 
-  it('should fetch and return EarthMovementBar and Accordion data', () => {
-    const { result } = renderHook(() => useFetchEarthMovementBarAndAccordionData());
+  return useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const earthMovementAggregates: any =
+      data?.btp_natural_hazards?.earth_movement_aggregates;
 
-    expect(result.current).toBeDefined();
-    expect(result.current.data).toBeDefined();
-    expect(result.current.data.EarthMovementBarData).toEqual([
-      {
-        zone: 'Zone 1',
-        active_locations: 10,
-        activeTIV: 100000,
-        prospect_locations: 5,
-        prospectTIV: 200000,
-      },
-    ]);
-    expect(result.current.data.EarthMovementAccordionData).toEqual([
-      {
-        region_code: 'Region 1',
-        region_description: 'Description 1',
-        active_location_count: 15,
-        activeTIV: 300000,
-        prospect_location_count: 10,
-        prospectTIV: 400000,
-      },
-    ]);
-    expect(result.current.error).toBeNull();
-  });
+    const earthMovementZoneAggregate: EarthMovementZoneData[] =
+      earthMovementAggregates?.earthquake_frequency_zone_aggregates?.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (aggregate: any) => {
+          const result: EarthMovementZoneData = {
+            zone: aggregate?.earthquake_frequency_zone_code,
+            active_locations:
+              aggregate?.active_locations_aggregate?.location_count,
+            activeTIV:
+              aggregate?.active_locations_aggregate?.total_insured_value,
+            prospect_locations:
+              aggregate?.prospect_locations_aggregate?.location_count,
+            prospectTIV:
+              aggregate?.prospect_locations_aggregate?.total_insured_value,
+          };
+          return result;
+        },
+      );
 
-  it('should handle errors', () => {
-    useSuspenseQuery.mockImplementationOnce(() => ({
-      data: null,
-      error: new Error('Error fetching data'),
-    }));
+    const earthMovementRegionAggregate: EarthMovementRegionData[] =
+      earthMovementAggregates?.earthquake_region_aggregates?.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (aggregate: any) => {
+          const result: EarthMovementRegionData = {
+            region_code: aggregate?.earthquake_region_code,
+            region_description: aggregate?.earthquake_region_description,
+            active_location_count:
+              aggregate?.active_locations_aggregate?.location_count,
+            activeTIV:
+              aggregate?.active_locations_aggregate?.total_insured_value,
+            prospect_location_count:
+              aggregate?.prospect_locations_aggregate?.total_insured_value,
+            prospectTIV:
+              aggregate?.prospect_locations_aggregate?.total_insured_value,
+          };
+          return result;
+        },
+      );
+    const payload = {
+      EarthMovementBarData: earthMovementZoneAggregate,
+      EarthMovementAccordionData: earthMovementRegionAggregate,
+      error,
+    };
+    return payload;
+  }, [data, error]);
+};
 
-    const { result } = renderHook(() => useFetchEarthMovementBarAndAccordionData());
-
-    expect(result.current.data).toBeUndefined();
-    expect(result.current.error).toEqual(new Error('Error fetching data'));
-  });
-});
+export default useFetchEarthMovementBarAndAccordionData;
