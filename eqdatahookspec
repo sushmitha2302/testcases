@@ -1,0 +1,140 @@
+import { renderHook } from '@testing-library/react-hooks';
+import { MockedProvider } from '@apollo/client/testing';
+import { useFetchEarthMovementBarAndAccordionData } from './useFetchEarthMovementBarAndAccordionData';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import {
+  BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+} from 'src/models';
+import { convertDateToJson } from 'src/mappers/natHazMappers';
+
+jest.mock('src/common/contexts/AccountContext');
+jest.mock('src/common/contexts/HeaderContext');
+jest.mock('src/mappers/natHazMappers', () => ({
+  convertDateToJson: jest.fn(),
+}));
+
+const mockAccountDetails = {
+  orgid: '1',
+};
+
+const mockHeader = {
+  selectedCurrency: 1,
+  asofDate: new Date(),
+};
+
+const mocks = [
+  {
+    request: {
+      query: BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+      variables: {
+        org_prospect_client_id: +mockAccountDetails.orgid,
+        as_of_date: convertDateToJson(mockHeader.asofDate),
+        context_currency_type_id: mockHeader.selectedCurrency,
+      },
+    },
+    result: {
+      data: {
+        btp_natural_hazards: {
+          earth_movement_aggregates: {
+            earthquake_frequency_zone_aggregates: [
+              {
+                earthquake_frequency_zone_code: 'zone1',
+                active_locations_aggregate: {
+                  location_count: 10,
+                  total_insured_value: 1000,
+                },
+                prospect_locations_aggregate: {
+                  location_count: 20,
+                  total_insured_value: 2000,
+                },
+              },
+            ],
+            earthquake_region_aggregates: [
+              {
+                earthquake_region_code: 'region1',
+                earthquake_region_description: 'Region 1',
+                active_locations_aggregate: {
+                  location_count: 15,
+                  total_insured_value: 1500,
+                },
+                prospect_locations_aggregate: {
+                  location_count: 25,
+                  total_insured_value: 2500,
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+];
+
+describe('useFetchEarthMovementBarAndAccordionData', () => {
+  beforeEach(() => {
+    (useAccount as jest.Mock).mockReturnValue({
+      accountDetails: mockAccountDetails,
+    });
+    (useHeader as jest.Mock).mockReturnValue(mockHeader);
+    (convertDateToJson as jest.Mock).mockReturnValue('mock-date-json');
+  });
+
+  it('should return EarthMovementBarData and EarthMovementAccordionData correctly', async () => {
+    const { result, waitForNextUpdate } = renderHook(
+      () => useFetchEarthMovementBarAndAccordionData(),
+      {
+        wrapper: ({ children }) => (
+          <MockedProvider mocks={mocks} addTypename={false}>
+            {children}
+          </MockedProvider>
+        ),
+      }
+    );
+
+    await waitForNextUpdate();
+
+    expect(result.current.EarthMovementBarData).toEqual([
+      {
+        zone: 'zone1',
+        active_locations: 10,
+        activeTIV: 1000,
+        prospect_locations: 20,
+        prospectTIV: 2000,
+      },
+    ]);
+
+    expect(result.current.EarthMovementAccordionData).toEqual([
+      {
+        region_code: 'region1',
+        region_description: 'Region 1',
+        active_location_count: 15,
+        activeTIV: 1500,
+        prospect_location_count: 25,
+        prospectTIV: 2500,
+      },
+    ]);
+
+    expect(result.current.error).toBeUndefined();
+  });
+
+  it('should handle errors', async () => {
+    const errorMocks = [
+      {
+        request: {
+          query: BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+          variables: {
+            org_prospect_client_id: +mockAccountDetails.orgid,
+            as_of_date: convertDateToJson(mockHeader.asofDate),
+            context_currency_type_id: mockHeader.selectedCurrency,
+          },
+        },
+        error: new Error('An error occurred'),
+      },
+    ];
+
+    const { result, waitForNextUpdate } = renderHook(
+      () => useFetchEarthMovementBarAndAccordionData(),
+      {
+        wrapper: ({ children }) => (
+          <MockedProvider mocks={erro
