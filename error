@@ -1,188 +1,180 @@
-NatHazOverview Component › Navigates to Earth Movement page when Earth Movement link is clicked
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MockedProvider } from '@apollo/client/testing';
+import { NATURAL_HAZARDS_EARTHQUAKE_ENABLED, NATURAL_HAZARDS_FLOOD_ENABLED, NATURAL_HAZARDS_WIND_ENABLED } from '@btp/shared-ui';
+import { NatHazOverview } from './NatHazOverview';
+import { useLocation } from 'react-router-dom';
+import { mockFlags } from 'jest-launchdarkly-mock';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { useFetchEarthMovementBarAndAccordionData } from 'src/hooks/useFetchEarthMovementBarData';
+import { useFetchFloodTIVData } from 'src/hooks/useFetchFloodTIVData';
+import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
 
-    TestingLibraryElementError: Found multiple elements with the text: Earth Movement
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => jest.fn(),
+  useLocation: () => ({
+    pathname: '/',
+  }),
+  useSearchParams: () => [new URLSearchParams({ currency: '02' })],
+}));
 
-    Here are the matching elements:
+jest.mock('src/hooks/useFetchEarthMovementBarData', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({
+    EarthMovementBarData: [],
+    EarthMovementAccordionData: [],
+  })),
+}));
 
-    Ignored nodes: comments, script, style
-    <rds-link
-      appearance="secondary"
-    >
-      Earth Movement
-    </rds-link>
+jest.mock('src/hooks/useFetchFloodTIVData', () => ({
+  __esModule: true,
+  useFetchFloodTIVData: jest.fn(() => ({
+    floodTIVDetails: {
+      highActive: 0,
+      highProspect: 0,
+      reducedActive: 0,
+      reducedProspect: 0,
+      moderateActive: 0,
+      moderatePropect: 0,
+      lowActive: 0,
+      lowProspect: 0,
+    },
+  })),
+}));
 
-    Ignored nodes: comments, script, style
-    <rds-text
-      spacing="none"
-      weight="semibold"
-    >
-      Earth Movement
-    </rds-text>
+jest.mock('src/common/contexts/AccountContext', () => ({
+  __esModule: true,
+  useAccount: jest.fn(() => ({
+    accountDetails: { orgid: '12345' },
+  })),
+}));
 
-    (If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  __esModule: true,
+  useHeader: jest.fn(() => ({
+    activeTab: 0,
+    setActiveTab: jest.fn(),
+    tivResult: [],
+    includeProspect: true,
+    setIncludeProspect: jest.fn(),
+  })),
+}));
 
-    Ignored nodes: comments, script, style
-    <body>
-      <div>
-        <rds-box
-          class="w-full h-full overflow-auto"
-          data-testid="overview"
-          height="calc(100vh - 4rem)"
-        >
-          <div
-            class="flex flex-row"
-          >
-            <div
-              class="flex flex-row flex-grow"
-            >
-              <div
-                class="flex-grow pb-4"
-              >
-                <rds-box
-                  bg="white"
-                  class="border-b border-solid"
-                  data-testid="table-filters"
-                  padding="lg 2xl"
-                >
-                  <div
-                    class="flex gap-3 items-center justify-between"
-                  >
-                    <div
-                      class="flex gap-3"
-                    >
-                      <rds-text
-                        color="gray-900"
-                        data-testid="text-tiv-location"
-                        spacing="sm"
-                        weight="semibold"
-                      >
-                        0 locations / 0 TIV
-                      </rds-text>
-                      <rds-hero-icon
-                        class="-pl-3"
-                        color="gray-400"
-                        name="information-circle"
-                        type="solid"
-                      />
-                      <rds-divider
-                        spacing="sm"
-                        type="vertical"
-                      />
-                      <rds-toggle
-                        label="Include Prospects"
-                        switched=""
-                      />
-                    </div>
-                  </div>
-                </rds-box>
-                <rds-box
-                  margin="2xl"
-                >
-                  <rds-text
-                    weight="semibold"
-                  >
-                    NatHaz Risk Scores
-                  </rds-text>
-                  <rds-card-container
-                    class="overflow-hidden pr-2"
-                    data-testid="risk-accordion"
-                    rounded=""
-                  >
-                    <div>
-                      <rds-accordion
-                        class="border-l-solid border-r-solid rounded-t-lg border-l-[10px] border-l-red-500"
-                        data-testid="Flood"
-                        selection-mode="single"
-                      >
-                        <rds-accordion-item
-                          class="p-0"
-                        >
-                          <div
-                            class="pl-6 py-3"
-                            slot="item-title"
-                          >
-                            <div
-                              class="flex gap-4 align-center"
-                            >
-                              <rds-link
-                                appearance="secondary"
-                              >
-                                Flood
-                              </rds-link>
-                              <div>
-                                <rds-badge
-                                  color="red"
-                                  text="Very Severe"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <rds-box
-                            class="-mt-8 border-b"
-                          >
-                            <div
-                              class="pl-6 pb-4"
-                            >
-                              <div>
-                                <div
-                                  data-testid="bar-chart"
-                                >
-                                  <div
-                                    class="flex gap-4 pr-3 justify-end"
-                                  >
-                                    <div
-                                      class="flex gap-2 align-center"
-                                    >
-                                      <div
-                                        class="flex gap-1 align-bottom"
-                                      >
-                                        <rds-text
-                                          color="gray-600"
-                                          size="xs"
-                                          spacing="none"
-                                        >
-                                          Total TIV
-                                          :
-                                        </rds-text>
-                                        <rds-text
-                                          color="gray-600"
-                                          size="xs"
-                                          spacing="none"
-                                          weight="semibold"
-                                        >
-                                          0.00
-                                        </rds-text>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div
-                                    data-highcharts-chart="24"
-                                    style="overflow: hidden;"
-                                  >
-                                    <div
-                                      class="highcharts-container "
-                                      dir="ltr"
-                                      id="highcharts-7b4ikfj-156"
-                                      style="position: relative; overflow: ...
+jest.mock('src/common/components/RightUtilityBar', () => ({
+  __esModule: true,
+  RightUtilityBar: () => null,
+}));
 
-      157 |       </MockedProvider>
-      158 |     );
-    > 159 |     const earthMovementLink = getByText('Earth Movement').closest('rds-link');
-          |                               ^
-      160 |     if (earthMovementLink) {
-      161 |       await waitFor(() => userEvent.click(earthMovementLink));
-      162 |       expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('earth-movement'));
+describe('NatHazOverview Component', () => {
+  beforeEach(() => {
+    mockFlags({
+      [NATURAL_HAZARDS_FLOOD_ENABLED]: true,
+      [NATURAL_HAZARDS_WIND_ENABLED]: true,
+      [NATURAL_HAZARDS_EARTHQUAKE_ENABLED]: true,
+    });
+  });
 
-      at Object.getElementError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/config.js:37:19)
-      at getElementError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:20:35)
-      at getMultipleElementsFoundError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:23:10)
-      at ../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:55:13
-      at ../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
-      at Object.getByText (src/NatHazOverview/NatHazOverview.spec.tsx:159:31)
+  it('renders NatHazOverview page successfully', () => {
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    expect(screen.getByTestId('overview')).toBeDefined();
+  });
 
+  it('Flood module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const floodLink = getByText('Flood');
+    expect(floodLink).toBeInTheDocument();
+  });
 
-Test Suites: 2 failed, 39 passed, 41 total
-Tests:       16 failed, 140 passed, 156 total
-Snapshots:   0 total
-Time:        45.636 s
-Ran all test suites.
+  it('Navigates to Flood page when Flood link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const floodLink = getByText('Flood').closest('rds-link');
+    if (floodLink) {
+      await waitFor(() => userEvent.click(floodLink));
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('flood'));
+    }
+  });
+
+  it('Wind module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const windLink = getByText('Wind');
+    expect(windLink).toBeInTheDocument();
+  });
+
+  it('Navigates to Wind page when Wind link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const windLink = getByText('Wind').closest('rds-link');
+    if (windLink) {
+      await waitFor(() => userEvent.click(windLink));
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('wind'));
+    }
+  });
+
+  it('Earth-Movement module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const earthMovementLink = getByText('Earth Movement');
+    expect(earthMovementLink).toBeInTheDocument();
+  });
+
+  it('Navigates to Earth Movement page when Earth Movement link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getAllByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const earthMovementLinks = getAllByText('Earth Movement').filter(element => element.closest('rds-link'));
+    if (earthMovementLinks.length > 0) {
+      await waitFor(() => userEvent.click(earthMovementLinks[0]));
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('earth-movement'));
+    }
+  });
+
+  it('does not set activeTab if pathname is overview and activeTab is 0', () => {
+    const mockSetActiveTab = jest.fn();
+    require('src/common/contexts/HeaderContext').useHeader.mockReturnValue({
+      activeTab: 0,
+      setActiveTab: mockSetActiveTab,
+    });
+
+    const { getByTestId } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    expect(mockSetActiveTab).not.toHaveBeenCalledWith(0);
+  });
+});
