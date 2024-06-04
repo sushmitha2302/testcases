@@ -1,180 +1,264 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MockedProvider } from '@apollo/client/testing';
-import { NATURAL_HAZARDS_EARTHQUAKE_ENABLED, NATURAL_HAZARDS_FLOOD_ENABLED, NATURAL_HAZARDS_WIND_ENABLED } from '@btp/shared-ui';
-import { NatHazOverview } from './NatHazOverview';
-import { useLocation } from 'react-router-dom';
-import { mockFlags } from 'jest-launchdarkly-mock';
-import { useAccount } from 'src/common/contexts/AccountContext';
-import { useHeader } from 'src/common/contexts/HeaderContext';
-import { useFetchEarthMovementBarAndAccordionData } from 'src/hooks/useFetchEarthMovementBarData';
-import { useFetchFloodTIVData } from 'src/hooks/useFetchFloodTIVData';
-import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
+/* eslint-disable no-unsafe-optional-chaining */
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  AccType,
+  BarChart,
+  RiskStatus,
+  TableList,
+  formatNumber,
+  convertToPercent,
+} from '@btp/shared-ui';
+import React from 'react';
+import { ColorThemes } from 'shared-ui/src/lib/Highcharts/BarChart/colorThemes';
+import { actionsMock } from 'src/NatHazOverview/NatHazOverview.mock';
+import { formatAmount } from 'src/mappers/natHazMappers';
+// eslint-disable-next-line consistent-return
+export const calculateTIV = (responses: any, res: any, type: string) => {
+  if (type === 'active') {
+    const totalActiveTIV: number = responses.reduce(
+      (sum: any, data: { activeTIV: number }) => sum + data.activeTIV || 0,
+      0,
+    );
+    const tivPercentage =
+      totalActiveTIV === 0
+        ? 0
+        : convertToPercent(res.activeTIV, totalActiveTIV);
+    return tivPercentage;
+  }
+  if (type === 'prospect') {
+    const totalProspectTIV: number = responses.reduce(
+      (sum: any, data: { prospectTIV: number }) => sum + data.prospectTIV || 0,
+      0,
+    );
+    const tivPercentage =
+      totalProspectTIV === 0
+        ? 0
+        : convertToPercent(res.prospectTIV, totalProspectTIV);
+    return tivPercentage;
+  }
+};
 
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => jest.fn(),
-  useLocation: () => ({
-    pathname: '/',
-  }),
-  useSearchParams: () => [new URLSearchParams({ currency: '02' })],
-}));
+export const createBarChart = (activezoneData: any, prospectzoneData: any) => {
+  const totalProspectTIV: number = prospectzoneData.reduce(
+    (sum: any, data: { barValue: any }) => sum + data.barValue,
+    0,
+  );
+  const totalActiveTIV: number = activezoneData.reduce(
+    (sum: any, data: { barValue: any }) => sum + data.barValue,
+    0,
+  );
 
-jest.mock('src/hooks/useFetchEarthMovementBarData', () => ({
-  __esModule: true,
-  default: jest.fn(() => ({
-    EarthMovementBarData: [],
-    EarthMovementAccordionData: [],
-  })),
-}));
+  const prospectEarthMovementBarChart = React.createElement(BarChart, {
+    barData: prospectzoneData,
+    rightContent: [
+      { label: 'Total TIV', value: formatAmount(totalProspectTIV) },
+    ],
+    theme: ColorThemes.Prospect,
+    total: totalProspectTIV,
+  });
+  const activeEarthMovementBarChart = React.createElement(BarChart, {
+    barData: activezoneData,
+    rightContent: [{ label: 'Total TIV', value: formatAmount(totalActiveTIV) }],
+    theme: ColorThemes.Active,
+    total: totalActiveTIV,
+  });
 
-jest.mock('src/hooks/useFetchFloodTIVData', () => ({
-  __esModule: true,
-  useFetchFloodTIVData: jest.fn(() => ({
-    floodTIVDetails: {
-      highActive: 0,
-      highProspect: 0,
-      reducedActive: 0,
-      reducedProspect: 0,
-      moderateActive: 0,
-      moderatePropect: 0,
-      lowActive: 0,
-      lowProspect: 0,
+  return { activeEarthMovementBarChart, prospectEarthMovementBarChart };
+};
+
+export const earthMovementColumnAccordionData = [
+  { key: 'region', header: 'Region' },
+  { key: 'locations', header: 'Locations' },
+  { key: 'tiv', header: 'TIV' },
+  { key: 'tiv_percentage', header: '% Of TIV' },
+];
+
+export const getEarthMovementBarData = (response: any) => {
+  const earthMovementAggData = response.reduce((res: any, curr: any) => {
+    if (!res[curr.zone]) {
+      res[curr.zone] = {
+        activeTIV: 0,
+        active_locations: 0,
+        prospectTIV: 0,
+        prospect_locations: 0,
+      };
+    }
+    res[curr.zone].activeTIV += curr.activeTIV;
+    res[curr.zone].active_locations += curr.active_locations;
+    res[curr.zone].prospectTIV += curr.prospectTIV;
+    res[curr.zone].prospect_locations += curr.prospect_locations;
+    return res;
+  }, {});
+
+  const activezoneData = Object.keys(earthMovementAggData)
+    .map((zone: any) => {
+      const TIV = earthMovementAggData[zone]?.activeTIV;
+      if (TIV === 0) {
+        return null;
+      }
+
+      const active = {
+        label: `Zone ${zone}`,
+        barValue: TIV,
+        legendValue: formatAmount(TIV),
+      };
+      return active;
+    })
+    .filter((active: any) => active !== null);
+
+  const prospectzoneData = Object.keys(earthMovementAggData).reduce(
+    (result: any, zone: any) => {
+      const activeTIV = earthMovementAggData[zone]?.activeTIV;
+      const prospectTIV = earthMovementAggData[zone]?.prospectTIV;
+      if (activeTIV !== 0) {
+        const active = {
+          label: `Zone ${zone}`,
+          barValue: activeTIV,
+          legendValue: formatAmount(activeTIV),
+        };
+        result.push(active);
+      }
+      if (prospectTIV !== 0) {
+        const prospect = {
+          label: `Zone ${zone}`,
+          barValue: prospectTIV,
+          legendValue: formatAmount(prospectTIV),
+          pattern: true,
+        };
+        result.push(prospect);
+      }
+      return result;
     },
-  })),
-}));
+    [],
+  );
 
-jest.mock('src/common/contexts/AccountContext', () => ({
-  __esModule: true,
-  useAccount: jest.fn(() => ({
-    accountDetails: { orgid: '12345' },
-  })),
-}));
+  return { activezoneData, prospectzoneData };
+};
 
-jest.mock('src/common/contexts/HeaderContext', () => ({
-  __esModule: true,
-  useHeader: jest.fn(() => ({
-    activeTab: 0,
-    setActiveTab: jest.fn(),
-    tivResult: [],
-    includeProspect: true,
-    setIncludeProspect: jest.fn(),
-  })),
-}));
-
-jest.mock('src/common/components/RightUtilityBar', () => ({
-  __esModule: true,
-  RightUtilityBar: () => null,
-}));
-
-describe('NatHazOverview Component', () => {
-  beforeEach(() => {
-    mockFlags({
-      [NATURAL_HAZARDS_FLOOD_ENABLED]: true,
-      [NATURAL_HAZARDS_WIND_ENABLED]: true,
-      [NATURAL_HAZARDS_EARTHQUAKE_ENABLED]: true,
-    });
-  });
-
-  it('renders NatHazOverview page successfully', () => {
-    render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    expect(screen.getByTestId('overview')).toBeDefined();
-  });
-
-  it('Flood module is available', () => {
-    const { getByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const floodLink = getByText('Flood');
-    expect(floodLink).toBeInTheDocument();
-  });
-
-  it('Navigates to Flood page when Flood link is clicked', async () => {
-    const mockNavigate = jest.fn();
-    require('react-router-dom').useNavigate = () => mockNavigate;
-
-    const { getByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const floodLink = getByText('Flood').closest('rds-link');
-    if (floodLink) {
-      await waitFor(() => userEvent.click(floodLink));
-      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('flood'));
+export const getEarthMovementRegionData = (response: any) => {
+  const earthMovementAggRegionData = response.reduce((res: any, curr: any) => {
+    if (!res[curr.region_code]) {
+      res[curr.region_code] = {
+        region_description: curr?.region_description || '',
+        activeTIV: 0,
+        active_location_count: 0,
+        prospectTIV: 0,
+        prospect_location_count: 0,
+      };
     }
+    res[curr.region_code].activeTIV += curr.activeTIV;
+    res[curr.region_code].active_location_count += curr.active_location_count;
+    const sumofActiveandProspectTIV: number = curr.activeTIV + curr.prospectTIV;
+    res[curr.region_code].prospectTIV += sumofActiveandProspectTIV;
+    const sumofActiveandProspectLocations: number =
+      curr.active_location_count + curr.prospect_location_count;
+    res[curr.region_code].prospect_location_count +=
+      sumofActiveandProspectLocations;
+    return res;
+  }, {});
+
+  const regionActiveTable = Object.keys(earthMovementAggRegionData)
+    .map((region: any) => {
+      const activeTIV = earthMovementAggRegionData[region]?.activeTIV;
+      if (activeTIV === 0) {
+        return null;
+      }
+      const regionObj = {
+        region: earthMovementAggRegionData[region].region_description,
+        locations: earthMovementAggRegionData[region]?.active_location_count,
+        tiv: formatNumber(activeTIV),
+        tiv_percentage: calculateTIV(
+          response,
+          earthMovementAggRegionData[region],
+          'active',
+        ),
+      };
+      return regionObj;
+    })
+    .filter((active: any) => active !== null);
+
+  const regionProspectTable = Object.keys(earthMovementAggRegionData)
+    .map((region: any) => {
+      const prospectTIV = earthMovementAggRegionData[region]?.prospectTIV;
+      if (prospectTIV === 0) {
+        return null;
+      }
+      const regionObj = {
+        region: earthMovementAggRegionData[region].region_description,
+        locations: earthMovementAggRegionData[region]?.prospect_location_count,
+        tiv: formatNumber(prospectTIV),
+        tiv_percentage: calculateTIV(
+          response,
+          earthMovementAggRegionData[region],
+          'prospect',
+        ),
+      };
+      return regionObj;
+    })
+    .filter((active: any) => active !== null);
+  return { regionActiveTable, regionProspectTable };
+};
+
+/**
+ * createRegionTable function will prepare regionTable element
+ * with earthmovementregionTable, columnMock and actionsMock
+ * @param { Array } earthmovementregionTable
+ * @returns regionTable
+ */
+const createRegionTable = (
+  regionActiveTable: any,
+  regionProspectTable: any,
+) => {
+  const regionActiveTableElement = React.createElement(TableList, {
+    tableTitle: 'Earth Movement',
+    tableData: regionActiveTable,
+    columnData: earthMovementColumnAccordionData,
+    actions: actionsMock,
   });
 
-  it('Wind module is available', () => {
-    const { getByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const windLink = getByText('Wind');
-    expect(windLink).toBeInTheDocument();
+  const regionProspectTableElement = React.createElement(TableList, {
+    tableTitle: 'Earth Movement',
+    tableData: regionProspectTable,
+    columnData: earthMovementColumnAccordionData,
+    actions: actionsMock,
   });
 
-  it('Navigates to Wind page when Wind link is clicked', async () => {
-    const mockNavigate = jest.fn();
-    require('react-router-dom').useNavigate = () => mockNavigate;
+  return { regionActiveTableElement, regionProspectTableElement };
+};
 
-    const { getByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const windLink = getByText('Wind').closest('rds-link');
-    if (windLink) {
-      await waitFor(() => userEvent.click(windLink));
-      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('wind'));
-    }
-  });
+/**
+ * CreateEarthMovementBarChart will create barchart elements
+ * @param { Array } EarthMovementBarData
+ * @param { Object } error
+ * @returns list with earthMovementBarChart elements
+ */
+export const CreateEarthMovementBarChart = (
+  EarthMovementBarData: any,
+  EarthMovementAccordionData: any,
+): AccType[] => {
+  const { activezoneData, prospectzoneData } =
+    getEarthMovementBarData(EarthMovementBarData);
+  const { activeEarthMovementBarChart, prospectEarthMovementBarChart } =
+    createBarChart(activezoneData, prospectzoneData);
+  const { regionActiveTable, regionProspectTable } = getEarthMovementRegionData(
+    EarthMovementAccordionData,
+  );
+  const { regionActiveTableElement, regionProspectTableElement } =
+    createRegionTable(regionActiveTable, regionProspectTable);
+  const activeChart = {
+    accTitle: 'Earth Movement',
+    status: RiskStatus.SEVERE,
+    accComp: prospectEarthMovementBarChart,
+    accItemComp: regionProspectTableElement,
+  };
+  const prospectChart = {
+    accTitle: 'Earth Movement',
+    status: RiskStatus.SEVERE,
+    accComp: activeEarthMovementBarChart,
+    accItemComp: regionActiveTableElement,
+  };
+  return [activeChart, prospectChart];
+};
 
-  it('Earth-Movement module is available', () => {
-    const { getByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const earthMovementLink = getByText('Earth Movement');
-    expect(earthMovementLink).toBeInTheDocument();
-  });
-
-  it('Navigates to Earth Movement page when Earth Movement link is clicked', async () => {
-    const mockNavigate = jest.fn();
-    require('react-router-dom').useNavigate = () => mockNavigate;
-
-    const { getAllByText } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    const earthMovementLinks = getAllByText('Earth Movement').filter(element => element.closest('rds-link'));
-    if (earthMovementLinks.length > 0) {
-      await waitFor(() => userEvent.click(earthMovementLinks[0]));
-      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('earth-movement'));
-    }
-  });
-
-  it('does not set activeTab if pathname is overview and activeTab is 0', () => {
-    const mockSetActiveTab = jest.fn();
-    require('src/common/contexts/HeaderContext').useHeader.mockReturnValue({
-      activeTab: 0,
-      setActiveTab: mockSetActiveTab,
-    });
-
-    const { getByTestId } = render(
-      <MockedProvider mocks={[]} addTypename={false}>
-        <NatHazOverview />
-      </MockedProvider>
-    );
-    expect(mockSetActiveTab).not.toHaveBeenCalledWith(0);
-  });
-});
+export default CreateEarthMovementBarChart;
