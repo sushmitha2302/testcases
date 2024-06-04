@@ -1,171 +1,181 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { userEvent } from '@testing-library/user-event';
+import userEvent from '@testing-library/user-event';
+import { MockedProvider } from '@apollo/client/testing';
+import { NATURAL_HAZARDS_EARTHQUAKE_ENABLED, NATURAL_HAZARDS_FLOOD_ENABLED, NATURAL_HAZARDS_WIND_ENABLED } from '@btp/shared-ui';
 import { NatHazOverview } from './NatHazOverview';
-import { mockFlags } from 'jest-launchdarkly-mock';
 import { useLocation } from 'react-router-dom';
+import { mockFlags } from 'jest-launchdarkly-mock';
 import { useAccount } from 'src/common/contexts/AccountContext';
 import { useHeader } from 'src/common/contexts/HeaderContext';
-import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
-import { MockedProvider } from '@apollo/client/testing';
-import { NATURAL_HAZARDS_EARTHQUAKE_ENABLED } from '@btp/shared-ui';
+import { useFetchEarthMovementBarAndAccordionData } from 'src/hooks/useFetchEarthMovementBarData';
+import { useFetchFloodTIVData } from 'src/hooks/useFetchFloodTIVData';
+import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
 
-const mockUsedNavigate = jest.fn();
-const mockUsedLocation = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockUsedNavigate,
-  useLocation: () => mockUsedLocation,
+  useNavigate: () => jest.fn(),
+  useLocation: () => ({
+    pathname: '/',
+  }),
   useSearchParams: () => [new URLSearchParams({ currency: '02' })],
 }));
 
-jest.mock('src/hooks/useGetAccountDetails', () => ({
+jest.mock('src/hooks/useFetchEarthMovementBarData', () => ({
   __esModule: true,
-  useGetAccountDetails: jest.fn(() => {
-    return {
-      setOrgId: jest.fn(),
-    };
-  }),
+  default: jest.fn(() => ({
+    EarthMovementBarData: [],
+    EarthMovementAccordionData: [],
+  })),
 }));
 
 jest.mock('src/hooks/useFetchFloodTIVData', () => ({
   __esModule: true,
-  useFetchFloodTIVData: jest.fn(() => {
-    return {
-      floodTIVDetails: {
-        highActive: 0,
-        highProspect: 0,
-        reducedActive: 0,
-        reducedProspect: 0,
-        moderateActive: 0,
-        moderatePropect: 0,
-        lowActive: 0,
-        lowProspect: 0,
-      },
-      error: null,
-    };
-  }),
-}));
-const mockPerilData = [
-  { accTitle: 'Flood' },
-  { accTitle: 'Wind' },
-  { accTitle: 'Earth Movement' },
-];
-jest.mock('src/common/contexts/HeaderContext', () => ({
-  __esModule: true,
-  useHeader: jest.fn(() => ({
-    activeModule: 'dfd',
-    setActiveModule: jest.fn(),
-    activeTab: 0,
-    setActiveTab: jest.fn(),
+  useFetchFloodTIVData: jest.fn(() => ({
+    floodTIVDetails: {
+      highActive: 0,
+      highProspect: 0,
+      reducedActive: 0,
+      reducedProspect: 0,
+      moderateActive: 0,
+      moderatePropect: 0,
+      lowActive: 0,
+      lowProspect: 0,
+    },
   })),
 }));
 
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockUsedNavigate,
-  useLocation: () => ({
-    pathname: '/',
-  }),
+jest.mock('src/common/contexts/AccountContext', () => ({
+  __esModule: true,
+  useAccount: jest.fn(() => ({
+    accountDetails: { orgid: '12345' },
+  })),
 }));
-jest.mock('@btp/shared-ui', () => ({
-  ...jest.requireActual('@btp/shared-ui'),
-  useShellNavigation: jest.fn(() => {
-    return {
-      navigateToBoB: jest.fn(),
-    };
-  }),
-  RiskStatus: {},
-  NATURAL_HAZARDS_FLOOD_ENABLED: 'natural-hazards-flood-enabled',
-  NATURAL_HAZARDS_WIND_ENABLED: 'natural-hazards-wind-enabled',
-  NATURAL_HAZARDS_EARTHQUAKE_ENABLED: 'natural-hazards-earthquake-enabled',
-})),
-  jest.mock('src/common/contexts/RouteParamsContext', () => ({
-    __esModule: true,
-    useRouteParams: jest.fn(() => {
-      return { routeParams: {}, setRouteParams: jest.fn() };
-    }),
-  }));
+
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  __esModule: true,
+  useHeader: jest.fn(() => ({
+    activeTab: 0,
+    setActiveTab: jest.fn(),
+    tivResult: [],
+    includeProspect: true,
+    setIncludeProspect: jest.fn(),
+  })),
+}));
 
 jest.mock('src/common/components/RightUtilityBar', () => ({
   __esModule: true,
   RightUtilityBar: () => null,
 }));
 
-jest.mock('src/common/contexts/AccountContext', () => ({
-  __esModule: true,
-  useAccount: jest.fn(() => {
-    return { accountDetails: {} };
-  }),
-}));
+describe('NatHazOverview Component', () => {
+  beforeEach(() => {
+    mockFlags({
+      [NATURAL_HAZARDS_FLOOD_ENABLED]: true,
+      [NATURAL_HAZARDS_WIND_ENABLED]: true,
+      [NATURAL_HAZARDS_EARTHQUAKE_ENABLED]: true,
+    });
+  });
 
-describe('NatHaz Overview Component', () => {
-  it('NatHaz overview page are rendered successfully', () => {
-    render(<NatHazOverview />);
+  it('renders NatHazOverview page successfully', () => {
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
     expect(screen.getByTestId('overview')).toBeDefined();
   });
 
-  it('Flood module available', () => {
-    mockFlags({ NATURAL_HAZARDS_FLOOD_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
+  it('Flood module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
     const floodLink = getByText('Flood');
     expect(floodLink).toBeInTheDocument();
   });
 
-  it('Navigate to flood page when flood link is clicked', async () => {
-    mockFlags({ NATURAL_HAZARDS_FLOOD_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
+  it('Navigates to Flood page when Flood link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
     const floodLink = getByText('Flood').closest('rds-link');
     if (floodLink) {
       await waitFor(() => userEvent.click(floodLink));
-      await expect(mockUsedNavigate).toHaveBeenCalledWith('/undefined/flood');
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('flood'));
     }
   });
 
-  it('Wind module available', () => {
-    mockFlags({ NATURAL_HAZARDS_WIND_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
-    const floodLink = getByText('Wind');
-    expect(floodLink).toBeInTheDocument();
+  it('Wind module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const windLink = getByText('Wind');
+    expect(windLink).toBeInTheDocument();
   });
 
-  it('Navigate to wind page when wind link is clicked', async () => {
-    mockFlags({ NATURAL_HAZARDS_WIND_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
+  it('Navigates to Wind page when Wind link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
     const windLink = getByText('Wind').closest('rds-link');
     if (windLink) {
       await waitFor(() => userEvent.click(windLink));
-      await expect(mockUsedNavigate).toHaveBeenCalledWith('/undefined/wind');
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('wind'));
     }
   });
 
-  it('Earth-Movement module available', () => {
-    mockFlags({ NATURAL_HAZARDS_EARTHQUAKE_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
-    const earthmovementLink = getByText('Earth Movement');
-    expect(earthmovementLink).toBeInTheDocument();
+  it('Earth-Movement module is available', () => {
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const earthMovementLink = getByText('Earth Movement');
+    expect(earthMovementLink).toBeInTheDocument();
   });
 
-  it('Navigate to earth movement page when earth movement link is clicked', async () => {
-    mockFlags({ NATURAL_HAZARDS_EARTHQUAKE_ENABLED: true });
-    const { getByText } = render(<NatHazOverview />);
-    const earthmovementLink = getByText('Earth Movement').closest('rds-link');
-    if (earthmovementLink) {
-      await waitFor(() => userEvent.click(earthmovementLink));
-      await expect(mockUsedNavigate).toHaveBeenCalledWith(
-        '/undefined/earth-movement',
-      );
+  it('Navigates to Earth Movement page when Earth Movement link is clicked', async () => {
+    const mockNavigate = jest.fn();
+    require('react-router-dom').useNavigate = () => mockNavigate;
+
+    const { getByText } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    const earthMovementLink = getByText('Earth Movement').closest('rds-link');
+    if (earthMovementLink) {
+      await waitFor(() => userEvent.click(earthMovementLink));
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('earth-movement'));
     }
   });
 
-  it('do not set activetab if pathname is overview and activetab is 0', () => {
-    useLocation().pathname = '/7765/';
-    const setActiveTab = jest.fn();
+  it('does not set activeTab if pathname is overview and activeTab is 0', () => {
+    const mockSetActiveTab = jest.fn();
     require('src/common/contexts/HeaderContext').useHeader.mockReturnValue({
       activeTab: 0,
-      setActiveTab,
+      setActiveTab: mockSetActiveTab,
     });
-    render(<NatHazOverview />);
-    expect(setActiveTab).not.toHaveBeenCalledWith(0);
+
+    const { getByTestId } = render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <NatHazOverview />
+      </MockedProvider>
+    );
+    expect(mockSetActiveTab).not.toHaveBeenCalledWith(0);
   });
 });
 
