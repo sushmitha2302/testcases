@@ -1,0 +1,188 @@
+NatHazOverview Component › Navigates to Earth Movement page when Earth Movement link is clicked
+
+    TestingLibraryElementError: Found multiple elements with the text: Earth Movement
+
+    Here are the matching elements:
+
+    Ignored nodes: comments, script, style
+    <rds-link
+      appearance="secondary"
+    >
+      Earth Movement
+    </rds-link>
+
+    Ignored nodes: comments, script, style
+    <rds-text
+      spacing="none"
+      weight="semibold"
+    >
+      Earth Movement
+    </rds-text>
+
+    (If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+    Ignored nodes: comments, script, style
+    <body>
+      <div>
+        <rds-box
+          class="w-full h-full overflow-auto"
+          data-testid="overview"
+          height="calc(100vh - 4rem)"
+        >
+          <div
+            class="flex flex-row"
+          >
+            <div
+              class="flex flex-row flex-grow"
+            >
+              <div
+                class="flex-grow pb-4"
+              >
+                <rds-box
+                  bg="white"
+                  class="border-b border-solid"
+                  data-testid="table-filters"
+                  padding="lg 2xl"
+                >
+                  <div
+                    class="flex gap-3 items-center justify-between"
+                  >
+                    <div
+                      class="flex gap-3"
+                    >
+                      <rds-text
+                        color="gray-900"
+                        data-testid="text-tiv-location"
+                        spacing="sm"
+                        weight="semibold"
+                      >
+                        0 locations / 0 TIV
+                      </rds-text>
+                      <rds-hero-icon
+                        class="-pl-3"
+                        color="gray-400"
+                        name="information-circle"
+                        type="solid"
+                      />
+                      <rds-divider
+                        spacing="sm"
+                        type="vertical"
+                      />
+                      <rds-toggle
+                        label="Include Prospects"
+                        switched=""
+                      />
+                    </div>
+                  </div>
+                </rds-box>
+                <rds-box
+                  margin="2xl"
+                >
+                  <rds-text
+                    weight="semibold"
+                  >
+                    NatHaz Risk Scores
+                  </rds-text>
+                  <rds-card-container
+                    class="overflow-hidden pr-2"
+                    data-testid="risk-accordion"
+                    rounded=""
+                  >
+                    <div>
+                      <rds-accordion
+                        class="border-l-solid border-r-solid rounded-t-lg border-l-[10px] border-l-red-500"
+                        data-testid="Flood"
+                        selection-mode="single"
+                      >
+                        <rds-accordion-item
+                          class="p-0"
+                        >
+                          <div
+                            class="pl-6 py-3"
+                            slot="item-title"
+                          >
+                            <div
+                              class="flex gap-4 align-center"
+                            >
+                              <rds-link
+                                appearance="secondary"
+                              >
+                                Flood
+                              </rds-link>
+                              <div>
+                                <rds-badge
+                                  color="red"
+                                  text="Very Severe"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <rds-box
+                            class="-mt-8 border-b"
+                          >
+                            <div
+                              class="pl-6 pb-4"
+                            >
+                              <div>
+                                <div
+                                  data-testid="bar-chart"
+                                >
+                                  <div
+                                    class="flex gap-4 pr-3 justify-end"
+                                  >
+                                    <div
+                                      class="flex gap-2 align-center"
+                                    >
+                                      <div
+                                        class="flex gap-1 align-bottom"
+                                      >
+                                        <rds-text
+                                          color="gray-600"
+                                          size="xs"
+                                          spacing="none"
+                                        >
+                                          Total TIV
+                                          :
+                                        </rds-text>
+                                        <rds-text
+                                          color="gray-600"
+                                          size="xs"
+                                          spacing="none"
+                                          weight="semibold"
+                                        >
+                                          0.00
+                                        </rds-text>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div
+                                    data-highcharts-chart="24"
+                                    style="overflow: hidden;"
+                                  >
+                                    <div
+                                      class="highcharts-container "
+                                      dir="ltr"
+                                      id="highcharts-7b4ikfj-156"
+                                      style="position: relative; overflow: ...
+
+      157 |       </MockedProvider>
+      158 |     );
+    > 159 |     const earthMovementLink = getByText('Earth Movement').closest('rds-link');
+          |                               ^
+      160 |     if (earthMovementLink) {
+      161 |       await waitFor(() => userEvent.click(earthMovementLink));
+      162 |       expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('earth-movement'));
+
+      at Object.getElementError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/config.js:37:19)
+      at getElementError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:20:35)
+      at getMultipleElementsFoundError (../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:23:10)
+      at ../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+      at ../../node_modules/@testing-library/react/node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+      at Object.getByText (src/NatHazOverview/NatHazOverview.spec.tsx:159:31)
+
+
+Test Suites: 2 failed, 39 passed, 41 total
+Tests:       16 failed, 140 passed, 156 total
+Snapshots:   0 total
+Time:        45.636 s
+Ran all test suites.
