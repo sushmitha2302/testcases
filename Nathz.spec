@@ -168,3 +168,147 @@ describe('NatHaz Overview Component', () => {
     expect(setActiveTab).not.toHaveBeenCalledWith(0);
   });
 });
+
+
+------------------------------------------------------------------------------
+
+import {
+  NATURAL_HAZARDS_EARTHQUAKE_ENABLED,
+  NATURAL_HAZARDS_FLOOD_ENABLED,
+  NATURAL_HAZARDS_WIND_ENABLED,
+  AccType,
+} from '@btp/shared-ui';
+import { RiskAccordion } from 'shared-ui/src/lib/RiskAccordion';
+import { useFlags } from 'launchdarkly-react-client-sdk';
+import { RdsBox, RdsText } from 'rds-components-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import NatHazFilters from 'src/NatHazDetails/NatHazFilters/NatHazFilters';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
+import { getNavigationUrl } from 'src/common/utils/navigationHelper';
+import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
+import CreateEarthMovementBarChart from 'src/common/components/charts/EarthMovementBarChart';
+import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
+import { useFetchFloodTIVData } from 'src/hooks/useFetchFloodTIVData';
+import { createDataForCharts } from 'src/NatHazContainer/charts/utils';
+
+export function NatHazOverview() {
+  const { accountDetails } = useAccount();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { EarthMovementBarData, EarthMovementAccordionData } =
+    useFetchEarthMovementBarAndAccordionData();
+  const {
+    activeTab,
+    setActiveTab,
+    tivResult,
+    includeProspect,
+    setIncludeProspect,
+  } = useHeader();
+  const flags = useFlags();
+  const floodEnabled = flags[NATURAL_HAZARDS_FLOOD_ENABLED];
+  const windEnabled = flags[NATURAL_HAZARDS_WIND_ENABLED];
+  const earthquakeEnabled = flags[NATURAL_HAZARDS_EARTHQUAKE_ENABLED];
+  const { floodTIVDetails } = useFetchFloodTIVData();
+  const [perilData, setPerilData] = useState<AccType[]>([]);
+  const handleTitleClick = (title: string) => {
+    let pageUrl: string = '';
+    switch (title) {
+      case 'Flood':
+        pageUrl = floodEnabled ? NatHazModuleUrlRouteEnum.FLOODURL : '';
+        break;
+      case 'Wind':
+        pageUrl = windEnabled ? NatHazModuleUrlRouteEnum.WINDURL : '';
+        break;
+      case 'Earth Movement':
+        pageUrl = earthquakeEnabled ? NatHazModuleUrlRouteEnum.EARTHURL : '';
+        break;
+      default:
+        break;
+    }
+    if (pageUrl) {
+      navigate(
+        getNavigationUrl({
+          locationPath: pathname,
+          orgId: accountDetails.orgid,
+          pageUrl,
+        }),
+      );
+    }
+  };
+
+  const updatedPerilData: AccType[] = perilData
+    ?.map((item) => {
+      if (
+        (item.accTitle === 'Flood' && floodEnabled) ||
+        (item.accTitle === 'Wind' && windEnabled) ||
+        (item.accTitle === 'Earth Movement' && earthquakeEnabled)
+      ) {
+        return {
+          ...item,
+          onTitleClick: (title: string) => handleTitleClick(title),
+        };
+      }
+      return {
+        accTitle: '',
+      };
+    })
+    .filter((item) => item.accTitle !== '');
+
+  useEffect(() => {
+    if (
+      (pathname.endsWith(`${accountDetails.orgid}`) ||
+        pathname.endsWith(`${accountDetails.orgid}/`)) &&
+      activeTab !== 0
+    ) {
+      setActiveTab(0);
+    }
+  }, [accountDetails.orgid, activeTab, pathname, setActiveTab]);
+
+  useEffect(() => {
+    const earthMovementChartData = CreateEarthMovementBarChart(
+      EarthMovementBarData,
+      EarthMovementAccordionData,
+    );
+    const earthMovementChart = includeProspect
+      ? earthMovementChartData[0]
+      : earthMovementChartData[1];
+    const chart = createDataForCharts(floodTIVDetails, includeProspect);
+    setPerilData([chart[0], earthMovementChart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includeProspect]);
+
+  return (
+    <RdsBox
+      className="w-full h-full overflow-auto"
+      data-testid="overview"
+      height="calc(100vh - 4rem)"
+    >
+      <div className="flex flex-row">
+        <div className="flex flex-row flex-grow">
+          <div className="flex-grow pb-4">
+            <NatHazFilters
+              tivResult={tivResult}
+              includeProspect={includeProspect}
+              setIncludeProspect={setIncludeProspect}
+            />
+            <RdsBox margin="2xl">
+              <RdsText weight="semibold">NatHaz Risk Scores</RdsText>
+              <RiskAccordion accData={updatedPerilData} />
+            </RdsBox>
+          </div>
+        </div>
+        <RdsBox
+          className="flex-shrink-0 h-full overflow-auto"
+          height="calc(100vh - 4rem)"
+        >
+          <RightUtilityBar />
+        </RdsBox>
+      </div>
+    </RdsBox>
+  );
+}
+
+export default NatHazOverview;
