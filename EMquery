@@ -1,0 +1,49 @@
+query BtpNaturalHazards_GetEarthMovementAggregates_V02($org_prospect_client_id: Int!, $as_of_date: Date!, $context_currency_type_id: Int!) {
+  btp_natural_hazards {
+    earth_movement_aggregates(org_prospect_client_id: $org_prospect_client_id, as_of_date: $as_of_date, context_currency_type_id: $context_currency_type_id) {
+      org_prospect_client_id
+      as_of_date
+      currency_type_id
+      locations_aggregate {
+        location_count
+        total_insured_value
+      }
+      active_locations_aggregate {
+        location_count
+        total_insured_value
+      }
+      earthquake_frequency_zone_aggregates {
+        earthquake_frequency_zone_code
+        earthquake_frequency_zone_description
+        locations_aggregate {
+          location_count
+          total_insured_value
+        }
+        active_locations_aggregate {
+          location_count
+          total_insured_value
+        }
+        prospect_locations_aggregate {
+          location_count
+          total_insured_value
+        }
+      }
+      earthquake_region_aggregates {
+        earthquake_region_description
+        earthquake_region_code
+        locations_aggregate {
+          location_count
+          total_insured_value
+        }
+        active_locations_aggregate {
+          location_count
+          total_insured_value
+        }
+        prospect_locations_aggregate {
+          location_count
+          total_insured_value
+        }
+      }
+    }
+  }
+}
