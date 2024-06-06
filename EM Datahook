@@ -1,12 +1,12 @@
 import { useSuspenseQuery } from '@apollo/client';
-import { OverviewBarChartDTO } from '@btp/shared-ui';
+import { EarthMovementBarchartDTO } from '@btp/shared-ui';
 import { useMemo } from 'react';
 import { useAccount } from 'src/common/contexts/AccountContext';
 import { useHeader } from 'src/common/contexts/HeaderContext';
 import { convertDateToJson } from 'src/mappers/natHazMappers';
 import {
-  BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
-  BtpNaturalHazards_GetEarthMovementAggregates_V01Query,
+  BtpNaturalHazards_GetEarthMovementAggregates_V02Document,
+  BtpNaturalHazards_GetEarthMovementAggregates_V02Query,
 } from 'src/models';
 
 const FetchEarthMovementBarAndAccordionDetails = (
@@ -15,8 +15,8 @@ const FetchEarthMovementBarAndAccordionDetails = (
   selectedCurrency: number | null,
 ) => {
   const { data, error } =
-    useSuspenseQuery<BtpNaturalHazards_GetEarthMovementAggregates_V01Query>(
-      BtpNaturalHazards_GetEarthMovementAggregates_V01Document,
+    useSuspenseQuery<BtpNaturalHazards_GetEarthMovementAggregates_V02Query>(
+      BtpNaturalHazards_GetEarthMovementAggregates_V02Document,
       {
         variables: {
           org_prospect_client_id: orgid,
@@ -42,61 +42,54 @@ export const useFetchEarthMovementBarAndAccordionData = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const earthMovementAggregates: any =
       data?.btp_natural_hazards?.earth_movement_aggregates;
-    const EarthMovementAggregates: OverviewBarChartDTO = {
+    const EarthMovementAggregates: EarthMovementBarchartDTO = {
       as_of_date: earthMovementAggregates?.as_of_date,
       currency_type_id: earthMovementAggregates?.currency_type_id,
       org_prospect_client_id: earthMovementAggregates?.org_prospect_client_id,
+      totalLocationCount:
+        earthMovementAggregates.locations_aggregate?.location_count,
+      totalTIV:
+        earthMovementAggregates.locations_aggregate?.total_insured_value,
+      totalActiveLocationCount:
+        earthMovementAggregates.active_locations_aggregate?.location_count,
+      totalActiveTIV:
+        earthMovementAggregates.active_locations_aggregate?.total_insured_value,
       earthquake_frequency_zone_aggregates:
         earthMovementAggregates?.earthquake_frequency_zone_aggregates?.map(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (aggregate: any) => {
             const res = {
-              earthquake_frequency_zone_code:
-                aggregate?.earthquake_frequency_zone_code,
-              earthquake_frequency_zone_description:
-                aggregate?.earthquake_frequency_zone_description,
-              active_locations_aggregate: aggregate?.active_locations_aggregate
-                ? aggregate?.active_locations_aggregate
-                : {
-                    location_count: 0,
-                    total_insured_value: 0,
-                  },
-              prospect_locations_aggregate:
-                aggregate?.prospect_locations_aggregate
-                  ? aggregate?.prospect_locations_aggregate
-                  : {
-                      location_count: 0,
-                      total_insured_value: 0,
-                    },
+              zoneCode: aggregate?.earthquake_frequency_zone_code,
+              zoneDescription: aggregate?.earthquake_frequency_zone_description,
+              totalLocationCount:
+                aggregate?.locations_aggregate?.location_count,
+              totalTIV: aggregate?.locations_aggregate?.total_insured_value,
+              activeLocationCount:
+                aggregate?.active_locations_aggregate?.location_count,
+              activeTIV:
+                aggregate?.active_locations_aggregate?.total_insured_value,
             };
             return res;
           },
-        ) || null,
+        ),
       earthquake_region_aggregates:
         earthMovementAggregates?.earthquake_region_aggregates?.map(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (aggregate: any) => {
             const res = {
-              earthquake_region_code: aggregate?.earthquake_region_code,
-              earthquake_region_description:
-                aggregate?.earthquake_region_description,
-              active_locations_aggregate: aggregate.active_locations_aggregate
-                ? aggregate?.active_locations_aggregate
-                : {
-                    location_count: 0,
-                    total_insured_value: 0,
-                  },
-              prospect_locations_aggregate:
-                aggregate.prospect_locations_aggregate
-                  ? aggregate?.prospect_locations_aggregate
-                  : {
-                      location_count: 0,
-                      total_insured_value: 0,
-                    },
+              regionCode: aggregate?.earthquake_region_code,
+              regionDescription: aggregate?.earthquake_region_description,
+              totalLocationCount:
+                aggregate?.locations_aggregate?.location_count,
+              totalTIV: aggregate?.locations_aggregate?.total_insured_value,
+              activeLocationCount:
+                aggregate?.active_locations_aggregate?.location_count,
+              activeTIV:
+                aggregate?.active_locations_aggregate?.total_insured_value,
             };
             return res;
           },
-        ) || null,
+        ),
     };
 
     const payload = {
