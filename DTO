@@ -6,6 +6,42 @@ export type LocationAggregates = {
 export type EarthquakeFrequencyZoneAggregate = {
   earthquake_frequency_zone_code: string | null;
   earthquake_frequency_zone_description: string | null;
+  activelocationAggregates: LocationAggregates;
+  locationAggregates: LocationAggregates;
+};
+export type EarthquakeFrequencyregionAggregate = {
+  earthquake_frequency_zone_code: string | null;
+  earthquake_frequency_zone_description: string | null;
+  activelocationAggregates: LocationAggregates;
+  locationAggregates: LocationAggregates;
+};
+
+export type OverviewBarChartDTO = {
+  as_of_date: string;
+  currency_type_id: number | null;
+
+  locationAggregates: LocationAggregates;
+  activelocationAggregates: LocationAggregates;
+  org_prospect_client_id: number | null;
+  earthquake_frequency_zone_aggregates:
+    | EarthquakeFrequencyZoneAggregate[]
+    | null;
+  earthquake_region_aggregates: EarthquakeFrequencyregionAggregate[] | null;
+};
+
+--------------------------------------------------------------
+
+
+
+
+export type LocationAggregates = {
+  location_count: number | null;
+  total_insured_value: number | null;
+};
+
+export type EarthquakeFrequencyZoneAggregate = {
+  earthquake_frequency_zone_code: string | null;
+  earthquake_frequency_zone_description: string | null;
   active_locations_aggregate: LocationAggregates | null;
   prospect_locations_aggregate: LocationAggregates | null;
 };
