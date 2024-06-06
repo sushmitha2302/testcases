@@ -1,302 +1,104 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  AccType,
-  BarChart,
-  CreateOverviewBarChart,
-  CreateOverviewTableList,
-  OverviewBarChartDTO,
-  RiskStatus,
-  TableList,
-  convertToPercent,
-} from '@btp/shared-ui';
-import React from 'react';
-import { ColorThemes } from 'shared-ui/src/lib/Highcharts/BarChart/colorThemes';
-import { actionsMock } from 'src/NatHazOverview/NatHazOverview.mock';
-import { formatAmount } from 'src/mappers/natHazMappers';
-
-// eslint-disable-next-line consistent-return
-export const calculateTIV = (responses: any, res: any, type: string) => {
-  if (type === 'active') {
-    const totalActiveTIV: number = responses.reduce(
-      (sum: any, data: { activeTIV: number }) => sum + data.activeTIV || 0,
-      0,
-    );
-    const tivPercentage =
-      totalActiveTIV === 0
-        ? 0
-        : Math.round((res.activeTIV / totalActiveTIV) * 100);
-    return tivPercentage;
-  }
-  if (type === 'prospect') {
-    const totalProspectTIV: number = responses.reduce(
-      (sum: any, data: { prospectTIV: number }) => sum + data.prospectTIV || 0,
-      0,
-    );
-    const tivPercentage =
-      totalProspectTIV === 0
-        ? 0
-        : Math.round((res.prospectTIV / totalProspectTIV) * 100);
-    return tivPercentage;
-  }
-};
-
-export const createBarChart = (
-  activezoneData: any,
-  prospectzoneData: any,
-  totalActiveTIV: number,
-  totalTIV: number,
+export const createChart = (
+  EarthMovementAggregates: EarthMovementBarchartDTO,
+  includeProspect: boolean,
 ) => {
-  const prospectEarthMovementBarChart = CreateOverviewBarChart(
-    prospectzoneData,
-    totalTIV,
-    ColorThemes.Prospect,
-    [{ label: 'Total TIV', value: formatAmount(totalTIV) }],
-  );
-  const activeEarthMovementBarChart = React.createElement(BarChart, {
-    barData: activezoneData,
-    rightContent: [{ label: 'Total TIV', value: formatAmount(totalActiveTIV) }],
-    theme: ColorThemes.Active,
-    total: totalActiveTIV,
-  });
+  const zoneList = ['50', '100', '250', '500', '>500'];
 
-  return { activeEarthMovementBarChart, prospectEarthMovementBarChart };
-};
-
-export const earthMovementColumnAccordionData = [
-  { key: 'region', header: 'Region' },
-  { key: 'locations', header: 'Locations' },
-  { key: 'tiv', header: 'TIV' },
-  { key: 'tiv_percentage', header: '% Of TIV' },
-];
-
-export const getEarthMovementBarData = (
-  EarthMovementAggregates: OverviewBarChartDTO,
-) => {
-  const earthMovementAggData =
-    EarthMovementAggregates?.earthquake_frequency_zone_aggregates?.reduce(
-      (res: any, curr: any) => {
-        const zone = curr.earthquake_frequency_zone_code;
-        const activeTIV =
-          curr?.active_locations_aggregate?.total_insured_value || 0;
-        const activeLocations =
-          curr?.active_locations_aggregate?.location_count || 0;
-        const prospectTIV =
-          curr?.prospect_locations_aggregate?.total_insured_value || 0;
-        const prospectLocations =
-          curr?.prospect_locations_aggregate?.location_count || 0;
-        if (!res[zone]) {
-          res[zone] = {
-            activeTIV: 0,
-            active_locations: 0,
-            prospectTIV: 0,
-            prospect_locations: 0,
-          };
+  const chartData: any = [];
+  const totalTiv: number = EarthMovementAggregates?.totalTIV ?? 0;
+  const totalActiveTiv: number = EarthMovementAggregates.totalActiveTIV ?? 0;
+  zoneList.forEach((zone) => {
+    const zoneData =
+      EarthMovementAggregates?.earthquake_frequency_zone_aggregates?.find(
+        (item) => item.zoneCode === zone,
+      );
+    if (zoneData) {
+      if (zoneData.activeTIV && zoneData.activeTIV !== 0) {
+        chartData.push({
+          label: `Zone ${zoneData?.zoneCode}`,
+          barValue: zoneData?.activeTIV,
+          legendValue: formatAmount(zoneData?.activeTIV ?? 0),
+        });
+      }
+      if (includeProspect) {
+        if (zoneData.totalTIV && zoneData.totalTIV !== 0) {
+          chartData.push({
+            label: `Zone ${zoneData?.zoneCode}`,
+            barValue: zoneData?.totalTIV,
+            legendValue: formatAmount(zoneData?.totalTIV ?? 0),
+            pattern: true,
+          });
         }
-        res[zone].activeTIV += activeTIV;
-        res[zone].active_locations += activeLocations;
-        res[zone].prospectTIV += prospectTIV;
-        res[zone].prospect_locations += prospectLocations;
-        return res;
+      }
+    }
+  });
+  return React.createElement(BarChart, {
+    barData: chartData,
+    rightContent: [
+      {
+        label: 'Total TIV',
+        value: formatAmount(includeProspect ? totalTiv : totalActiveTiv),
       },
-      {},
-    );
-
-  let totalActiveTIV = 0;
-  Object.keys(earthMovementAggData).forEach((key) => {
-    totalActiveTIV += earthMovementAggData[key].activeTIV;
+    ],
+    theme: includeProspect ? ColorThemes.Prospect : ColorThemes.Active,
+    total: includeProspect ? totalTiv : totalActiveTiv,
   });
-
-  let totalProspectTIV = 0;
-  Object.keys(earthMovementAggData).forEach((key) => {
-    totalProspectTIV += earthMovementAggData[key].prospectTIV;
-  });
-
-  const totalTIV = totalActiveTIV + totalProspectTIV;
-
-  const activezoneData = Object.keys(earthMovementAggData)
-    .map((zone: any) => {
-      const TIV = earthMovementAggData[zone]?.activeTIV;
-      if (TIV === 0 || zone === 'null') {
-        return null;
-      }
-
-      const active = {
-        label: `Zone ${zone}`,
-        barValue: TIV,
-        legendValue: formatAmount(TIV),
-      };
-      return active;
-    })
-    .filter((active: any) => active !== null);
-
-  const prospectzoneData = Object.keys(earthMovementAggData).reduce(
-    (result: any, zone: any) => {
-      const activeTIV = earthMovementAggData[zone]?.activeTIV;
-      const prospectTIV = earthMovementAggData[zone]?.prospectTIV;
-      if (activeTIV !== 0 && zone !== 'null') {
-        const active = {
-          label: `Zone ${zone}`,
-          barValue: activeTIV,
-          legendValue: formatAmount(activeTIV),
-        };
-        result.push(active);
-      }
-      if (prospectTIV !== 0 && zone !== 'null') {
-        const prospect = {
-          label: `Zone ${zone}`,
-          barValue: prospectTIV,
-          legendValue: formatAmount(prospectTIV),
-          pattern: true,
-        };
-        result.push(prospect);
-      }
-      return result;
-    },
-    [],
-  );
-
-  return { activezoneData, prospectzoneData, totalActiveTIV, totalTIV };
 };
 
-export const getEarthMovementRegionData = (
-  EarthMovementAggregates: OverviewBarChartDTO,
+export const createAccordion = (
+  EarthMovementAggregates: EarthMovementBarchartDTO,
+  includeProspect: boolean,
 ) => {
-  const earthMovementAggRegionData =
-    EarthMovementAggregates?.earthquake_region_aggregates?.reduce(
-      (res: any, curr: any) => {
-        const regionCode = curr?.earthquake_region_code;
-        const regionDescription = curr?.earthquake_region_description;
-        const activeTIV =
-          curr?.active_locations_aggregate?.total_insured_value || 0;
-        const activeLocations =
-          curr?.active_locations_aggregate?.location_count || 0;
-        const prospectTIV =
-          curr?.prospect_locations_aggregate?.total_insured_value || 0;
-        const prospectLocations =
-          curr?.prospect_locations_aggregate?.location_count || 0;
-        if (!res[regionCode]) {
-          res[regionCode] = {
-            region_description: regionDescription,
-            activeTIV: 0,
-            active_location_count: 0,
-            prospectTIV: 0,
-            prospect_location_count: 0,
-          };
-        }
-        res[regionCode].activeTIV += activeTIV;
-        res[regionCode].active_location_count += activeLocations;
-        res[regionCode].prospectTIV += activeTIV + prospectTIV;
-        res[regionCode].prospect_location_count +=
-          activeLocations + prospectLocations;
-        return res;
-      },
-      {},
-    );
-
-  let totalActiveTIV = 0;
-  Object.keys(earthMovementAggRegionData).forEach((key) => {
-    totalActiveTIV += earthMovementAggRegionData[key].activeTIV;
+  const totalTiv: number = EarthMovementAggregates?.totalTIV ?? 0;
+  const totalActiveTiv: number = EarthMovementAggregates.totalActiveTIV ?? 0;
+  const accordionData: any = [];
+  EarthMovementAggregates.earthquake_region_aggregates?.forEach((region) => {
+    const regionData = {
+      region: region.regionDescription,
+      locations: includeProspect
+        ? region.totalLocationCount
+        : region.activeLocationCount,
+      tiv: formatNumber(includeProspect ? region.totalTIV : region.activeTIV),
+      tiv_percentage: convertToPercent(
+        includeProspect ? region.totalTIV ?? 0 : region.activeTIV ?? 0,
+        includeProspect ? totalTiv : totalActiveTiv,
+      ),
+    };
+    if (regionData.locations !== 0) {
+      accordionData.push(regionData);
+    }
   });
-
-  let totalProspectTIV = 0;
-  Object.keys(earthMovementAggRegionData).forEach((key) => {
-    totalProspectTIV += earthMovementAggRegionData[key].prospectTIV;
-  });
-
-  const regionActiveTable = Object.keys(earthMovementAggRegionData)
-    .map((region: any) => {
-      const activeTIV = earthMovementAggRegionData[region]?.activeTIV;
-      if (activeTIV === 0 || region === 'null') {
-        return null;
-      }
-      const regionObj = {
-        region: earthMovementAggRegionData[region].region_description,
-        locations: earthMovementAggRegionData[region]?.active_location_count,
-        tiv: new Intl.NumberFormat('en-US').format(activeTIV),
-        tiv_percentage: convertToPercent(activeTIV, totalActiveTIV),
-      };
-      return regionObj;
-    })
-    .filter((active: any) => active !== null);
-
-  const regionProspectTable = Object.keys(earthMovementAggRegionData)
-    .map((region: any) => {
-      const prospectTIV = earthMovementAggRegionData[region]?.prospectTIV;
-      if (prospectTIV === 0 || region === 'null') {
-        return null;
-      }
-      const regionObj = {
-        region: earthMovementAggRegionData[region].region_description,
-        locations: earthMovementAggRegionData[region]?.prospect_location_count,
-        tiv: new Intl.NumberFormat('en-US').format(prospectTIV),
-        tiv_percentage: convertToPercent(prospectTIV, totalProspectTIV),
-      };
-      return regionObj;
-    })
-    .filter((active: any) => active !== null);
-  return { regionActiveTable, regionProspectTable };
-};
-
-/**
- * createRegionTable function will prepare regionTable element
- * with earthmovementregionTable, columnMock and actionsMock
- * @param { Array } earthmovementregionTable
- * @returns regionTable
- */
-const createRegionTable = (
-  regionActiveTable: any,
-  regionProspectTable: any,
-) => {
-  const regionActiveTableElement = CreateOverviewTableList(
-    'Earth Movement',
-    regionActiveTable,
-    earthMovementColumnAccordionData,
-    actionsMock,
-  );
-
-  const regionProspectTableElement = React.createElement(TableList, {
+  return React.createElement(TableList, {
     tableTitle: 'Earth Movement',
-    tableData: regionProspectTable,
+    tableData: accordionData,
     columnData: earthMovementColumnAccordionData,
     actions: actionsMock,
   });
-
-  return { regionActiveTableElement, regionProspectTableElement };
 };
 
 /**
  * CreateEarthMovementBarChart will create barchart elements
- * @param { Array } EarthMovementBarData
- * @param { Object } error
+ * @param { Array } EarthMovementAggregates
+ * @param { Boolean } includeProspect
  * @returns list with earthMovementBarChart elements
  */
 export const CreateEarthMovementBarChart = (
-  EarthMovementAggregates: OverviewBarChartDTO,
-): AccType[] => {
-  const { activezoneData, prospectzoneData, totalActiveTIV, totalTIV } =
-    getEarthMovementBarData(EarthMovementAggregates);
-  const { activeEarthMovementBarChart, prospectEarthMovementBarChart } =
-    createBarChart(activezoneData, prospectzoneData, totalActiveTIV, totalTIV);
+  EarthMovementAggregates: EarthMovementBarchartDTO,
+  includeProspect: boolean,
+  includeAccordion: boolean,
+): AccType => {
+  const accComp = createChart(EarthMovementAggregates, includeProspect);
+  const accItemComp = createAccordion(EarthMovementAggregates, includeProspect);
 
-  const { regionActiveTable, regionProspectTable } = getEarthMovementRegionData(
-    EarthMovementAggregates,
-  );
-  const { regionActiveTableElement, regionProspectTableElement } =
-    createRegionTable(regionActiveTable, regionProspectTable);
-  const activeChart = {
+  const earthMovementPeril: AccType = {
     accTitle: 'Earth Movement',
     status: RiskStatus.SEVERE,
-    accComp: prospectEarthMovementBarChart,
-    accItemComp: regionProspectTableElement,
+    accComp,
   };
-  const prospectChart = {
-    accTitle: 'Earth Movement',
-    status: RiskStatus.SEVERE,
-    accComp: activeEarthMovementBarChart,
-    accItemComp: regionActiveTableElement,
-  };
-  return [activeChart, prospectChart];
+  if (includeAccordion) {
+    earthMovementPeril.accItemComp = accItemComp;
+  }
+  return earthMovementPeril;
 };
 
 export default CreateEarthMovementBarChart;
