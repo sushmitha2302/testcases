@@ -97,7 +97,8 @@ export const useFetchEarthMovementBarAndAccordionData = () => {
       error,
     };
     return payload;
-  }, [data, error]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCurrency, asofDate, data, error]);
 };
 
 export default useFetchEarthMovementBarAndAccordionData;
