@@ -1,3 +1,28 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  AccType,
+  BarChart,
+  EarthMovementBarchartDTO,
+  RiskStatus,
+  TableList,
+  convertToPercent,
+  formatNumber,
+} from '@btp/shared-ui';
+import React from 'react';
+import { ColorThemes } from 'shared-ui/src/lib/Highcharts/BarChart/colorThemes';
+import {
+  actionsMock,
+  formatAmount,
+} from 'shared-ui/src/lib/NatHazPerilOverview/utils/utils';
+
+export const earthMovementColumnAccordionData = [
+  { key: 'region', header: 'Region' },
+  { key: 'locations', header: 'Locations' },
+  { key: 'tiv', header: 'TIV' },
+  { key: 'tiv_percentage', header: '% Of TIV' },
+];
+
 export const createChart = (
   EarthMovementAggregates: EarthMovementBarchartDTO,
   includeProspect: boolean,
@@ -6,7 +31,7 @@ export const createChart = (
 
   const chartData: any = [];
   const totalTiv: number = EarthMovementAggregates?.totalTIV ?? 0;
-  const totalActiveTiv: number = EarthMovementAggregates.totalActiveTIV ?? 0;
+  const totalActiveTiv: number = EarthMovementAggregates?.totalActiveTIV ?? 0;
   zoneList.forEach((zone) => {
     const zoneData =
       EarthMovementAggregates?.earthquake_frequency_zone_aggregates?.find(
@@ -50,9 +75,9 @@ export const createAccordion = (
   includeProspect: boolean,
 ) => {
   const totalTiv: number = EarthMovementAggregates?.totalTIV ?? 0;
-  const totalActiveTiv: number = EarthMovementAggregates.totalActiveTIV ?? 0;
+  const totalActiveTiv: number = EarthMovementAggregates?.totalActiveTIV ?? 0;
   const accordionData: any = [];
-  EarthMovementAggregates.earthquake_region_aggregates?.forEach((region) => {
+  EarthMovementAggregates?.earthquake_region_aggregates?.forEach((region) => {
     const regionData = {
       region: region.regionDescription,
       locations: includeProspect
@@ -64,7 +89,7 @@ export const createAccordion = (
         includeProspect ? totalTiv : totalActiveTiv,
       ),
     };
-    if (regionData.locations !== 0) {
+    if (regionData.locations && regionData.locations !== 0) {
       accordionData.push(regionData);
     }
   });
@@ -92,7 +117,7 @@ export const CreateEarthMovementBarChart = (
 
   const earthMovementPeril: AccType = {
     accTitle: 'Earth Movement',
-    status: RiskStatus.SEVERE,
+    status: RiskStatus?.SEVERE,
     accComp,
   };
   if (includeAccordion) {
