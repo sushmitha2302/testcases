@@ -1,0 +1,30 @@
+export type LocationAggregates = {
+  totalLocationCount: number | null;
+  totalTIV: number | null;
+  activeLocationCount: number | null;
+  activeTIV: number | null;
+};
+
+export type EarthquakeFrequencyZoneAggregate = LocationAggregates & {
+  zoneCode: string | null;
+  zoneDescription: string | null;
+};
+
+export type EarthquakeRegionAggregate = LocationAggregates & {
+  regionCode: string | null;
+  regionDescription: string | null;
+};
+
+export type EarthMovementBarchartDTO = {
+  as_of_date: string;
+  currency_type_id: number | null;
+  org_prospect_client_id: number | null;
+  totalLocationCount: number | null;
+  totalTIV: number | null;
+  totalActiveLocationCount: number | null;
+  totalActiveTIV: number | null;
+  earthquake_frequency_zone_aggregates:
+    | EarthquakeFrequencyZoneAggregate[]
+    | null;
+  earthquake_region_aggregates: EarthquakeRegionAggregate[] | null;
+};
