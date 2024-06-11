@@ -1,0 +1,88 @@
+import { useSuspenseQuery } from '@apollo/client';
+import { FloodTIVDataDTO, getFloodAggData } from '@btp/shared-ui';
+import {
+  BtpNaturalHazards_GetFloodAggregates_V02Document,
+  BtpNaturalHazards_GetFloodAggregates_V02Query,
+} from 'src/models';
+import { useMemo } from 'react';
+import { convertDateToJson } from 'src/mappers/natHazMappers';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+
+export const FetchFloodBarAndAccordionDetails = (
+  orgid: number,
+  selectedCurrency: number | null,
+  date: Date | null,
+) => {
+  const { data, error } =
+    useSuspenseQuery<BtpNaturalHazards_GetFloodAggregates_V02Query>(
+      BtpNaturalHazards_GetFloodAggregates_V02Document,
+      {
+        variables: {
+          org_prospect_client_id: orgid,
+          as_of_date: convertDateToJson(date),
+          context_currency_type_id: selectedCurrency,
+        },
+      },
+    );
+  return { data, error };
+};
+
+export const useFetchFloodBarAndAccordionData = () => {
+  const { accountDetails } = useAccount();
+  const { selectedCurrency, asofDate } = useHeader();
+  const { orgid } = accountDetails;
+  const { data, error } = FetchFloodBarAndAccordionDetails(
+    +orgid,
+    selectedCurrency,
+    asofDate,
+  );
+
+  const floodAggDetails: FloodTIVDataDTO = data?.btp_natural_hazards
+    ?.flood_aggregates as FloodTIVDataDTO;
+
+  return useMemo(() => {
+    const floodTivData = floodAggDetails?.flood_hazard_frequency_aggregates;
+
+    const { highDataObj, lowDataObj, reducedDataObj, moderateDataObj } =
+      getFloodAggData(floodTivData);
+
+    const FloodAggregates = {
+      as_of_date: floodAggDetails?.as_of_date,
+      currency_type_id: floodAggDetails?.currency_type_id,
+      org_prospect_client_id: floodAggDetails?.org_prospect_client_id,
+      floodTivData,
+      totalLocationCount:
+        floodAggDetails?.location_aggregates?.location_count ?? 0,
+      totalTIV: floodAggDetails?.location_aggregates?.total_insured_value ?? 0,
+      totalActiveLocationCount:
+        floodAggDetails?.active_location_aggregates?.location_count ?? 0,
+      totalActiveTIV:
+        floodAggDetails?.active_location_aggregates?.total_insured_value ?? 0,
+      highActive:
+        highDataObj?.active_location_aggregates?.total_insured_value ?? 0,
+      highProspect:
+        highDataObj?.prospect_location_aggregates?.total_insured_value ?? 0,
+      reducedActive:
+        reducedDataObj?.active_location_aggregates?.total_insured_value ?? 0,
+      reducedProspect:
+        reducedDataObj?.prospect_location_aggregates?.total_insured_value ?? 0,
+      moderateActive:
+        moderateDataObj?.active_location_aggregates?.total_insured_value ?? 0,
+      moderateProspect:
+        moderateDataObj?.prospect_location_aggregates?.total_insured_value ?? 0,
+      lowActive:
+        lowDataObj?.active_location_aggregates?.total_insured_value ?? 0,
+      lowProspect:
+        lowDataObj?.prospect_location_aggregates?.total_insured_value ?? 0,
+    };
+    const payload = {
+      FloodAggregates,
+      error,
+    };
+    return payload;
+  }, [floodAggDetails, error]);
+};
+
+export default useFetchFloodBarAndAccordionData;
+
