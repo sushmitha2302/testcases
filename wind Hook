@@ -1,0 +1,128 @@
+
+import { useSuspenseQuery } from '@apollo/client';
+import { WindBarChartDTO } from '@btp/shared-ui';
+import {
+  BtpNaturalHazards_GetWindAggregates_V02Document,
+  BtpNaturalHazards_GetWindAggregates_V02Query,
+} from 'src/models';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { convertDateToJson } from 'src/mappers/natHazMappers';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { useMemo } from 'react';
+
+export const FetchWindAggregationDetails = (
+  orgid: number,
+  selectedCurrency: number | null,
+  date: Date | null,
+) => {
+  const { data, error } =
+    useSuspenseQuery<BtpNaturalHazards_GetWindAggregates_V02Query>(
+      BtpNaturalHazards_GetWindAggregates_V02Document,
+      {
+        variables: {
+          org_prospect_client_id: orgid,
+          as_of_date: convertDateToJson(date),
+          context_currency_type_id: selectedCurrency,
+        },
+      },
+    );
+  return { data, error };
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loadTierBarChartData = (tierAggregate: any) => {
+  const res = {
+    underWritingWindTierCode: tierAggregate?.under_writing_wind_tier_code ?? 0,
+    underWritingWindTierDescription:
+      tierAggregate?.under_writing_wind_tier_description ?? 0,
+    totalTIV: tierAggregate?.location_aggregates?.total_insured_value ?? 0,
+    windLossExpectancy:
+      tierAggregate?.location_aggregates?.wind_loss_expectancy ?? 0,
+    totalLocationCount: tierAggregate?.location_aggregates?.location_count ?? 0,
+    activeTIV:
+      tierAggregate?.active_location_aggregates?.total_insured_value ?? 0,
+    windLossActiveExpectancy:
+      tierAggregate?.active_location_aggregates?.wind_loss_expectancy ?? 0,
+    activeLocationCount:
+      tierAggregate?.active_location_aggregates?.location_count ?? 0,
+    prospectTIV:
+      tierAggregate?.prospect_location_aggregates?.total_insured_value ?? 0,
+    windLossProspectExpectancy:
+      tierAggregate?.prospect_location_aggregates?.wind_loss_expectancy ?? 0,
+    prospectLocationCount:
+      tierAggregate?.prospect_location_aggregates?.location_count ?? 0,
+  };
+  return res;
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loadRegionBarChartData = (regionAggregate: any) => {
+  const res = {
+    windRegion: regionAggregate?.wind_region,
+    totalTIV: regionAggregate?.location_aggregates?.total_insured_value ?? 0,
+    windLossExpectancy:
+      regionAggregate?.location_aggregates?.wind_loss_expectancy ?? 0,
+    totalLocationCount:
+      regionAggregate?.location_aggregates?.location_count ?? 0,
+    activeTIV:
+      regionAggregate?.active_location_aggregates?.total_insured_value ?? 0,
+    windLossActiveExpectancy:
+      regionAggregate?.active_location_aggregates?.wind_loss_expectancy ?? 0,
+    activeLocationCount:
+      regionAggregate?.active_location_aggregates?.location_count ?? 0,
+    wind_tier_aggregates: regionAggregate?.wind_tier_aggregates?.map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (windTierAggregate: any) => {
+        return loadTierBarChartData(windTierAggregate);
+      },
+    ),
+  };
+  return res;
+};
+
+export const useFetchWindBarChartData = () => {
+  const { accountDetails } = useAccount();
+  const { selectedCurrency, asofDate } = useHeader();
+  const { orgid } = accountDetails;
+
+  const { data, error } = FetchWindAggregationDetails(
+    +orgid,
+    selectedCurrency,
+    asofDate,
+  );
+
+  return useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const windAggregates: any = data?.btp_natural_hazards?.wind_aggregates;
+
+    const WindAggregates: WindBarChartDTO = {
+      as_of_date: windAggregates?.as_of_date,
+      currency_type_id: windAggregates?.currency_type_id,
+      org_prospect_client_id: windAggregates?.org_prospect_client_id,
+      totalTIV: windAggregates?.location_aggregates?.total_insured_value ?? 0,
+      totalLocationCount:
+        windAggregates?.location_aggregates?.location_count ?? 0,
+      windLossExpectancy:
+        windAggregates?.location_aggregates?.wind_loss_expectancy ?? 0,
+      totalActiveTIV:
+        windAggregates?.active_location_aggregates?.total_insured_value ?? 0,
+      totalActiveLocationCount:
+        windAggregates?.active_location_aggregates?.location_count ?? 0,
+      windLossActiveExpectancy:
+        windAggregates?.active_location_aggregates?.wind_loss_expectancy ?? 0,
+      wind_region_aggregates: windAggregates?.wind_region_aggregates?.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (regionAggregate: any) => {
+          return loadRegionBarChartData(regionAggregate);
+        },
+      ),
+    };
+
+    const payload = {
+      WindAggregates,
+      error,
+    };
+    return payload;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCurrency, asofDate, data, error]);
+};
+
+export default useFetchWindBarChartData;
