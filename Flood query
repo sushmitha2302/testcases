@@ -1,0 +1,43 @@
+query BtpNaturalHazards_GetFloodAggregates_V02($org_prospect_client_id: Int!, $as_of_date: Date!, $context_currency_type_id: Int!) {
+  btp_natural_hazards {
+    flood_aggregates(org_prospect_client_id: $org_prospect_client_id, as_of_date: $as_of_date, context_currency_type_id: $context_currency_type_id) {
+      org_prospect_client_id
+      as_of_date
+      currency_type_id
+      location_aggregates {
+        total_insured_value
+        hundred_year_loss_expectancy
+        five_hundred_year_loss_expectancy
+        location_count
+      }
+      active_location_aggregates {
+        total_insured_value
+        hundred_year_loss_expectancy
+        five_hundred_year_loss_expectancy
+        location_count
+      }
+      flood_hazard_frequency_aggregates {
+        flood_hazard_frequency
+        location_aggregates {
+          total_insured_value
+          hundred_year_loss_expectancy
+          five_hundred_year_loss_expectancy
+          location_count
+        }
+        active_location_aggregates {
+          total_insured_value
+          hundred_year_loss_expectancy
+          five_hundred_year_loss_expectancy
+          location_count
+        }
+        prospect_location_aggregates {
+          total_insured_value
+          hundred_year_loss_expectancy
+          five_hundred_year_loss_expectancy
+          location_count
+        }
+      }
+    }
+  }
+}
+
