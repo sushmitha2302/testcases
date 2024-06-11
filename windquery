@@ -1,0 +1,52 @@
+query BtpNaturalHazards_GetWindAggregates_V02($org_prospect_client_id: Int!, $as_of_date: Date!, $context_currency_type_id: Int!) {
+  btp_natural_hazards {
+    wind_aggregates(org_prospect_client_id: $org_prospect_client_id, as_of_date: $as_of_date, context_currency_type_id: $context_currency_type_id) {
+      org_prospect_client_id
+      as_of_date
+      currency_type_id
+      location_aggregates {
+        total_insured_value
+        wind_loss_expectancy
+        location_count
+      }
+      active_location_aggregates {
+        total_insured_value
+        wind_loss_expectancy
+        location_count
+      }
+      wind_region_aggregates {
+        wind_region
+        location_aggregates {
+          total_insured_value
+          wind_loss_expectancy
+          location_count
+        }
+        active_location_aggregates {
+          total_insured_value
+          wind_loss_expectancy
+          location_count
+        }
+        wind_tier_aggregates {
+          under_writing_wind_tier_code
+          under_writing_wind_tier_description
+          location_aggregates {
+            total_insured_value
+            wind_loss_expectancy
+            location_count
+          }
+          active_location_aggregates {
+            total_insured_value
+            wind_loss_expectancy
+            location_count
+          }
+          prospect_location_aggregates {
+            total_insured_value
+            wind_loss_expectancy
+            location_count
+          }
+        }
+      }
+    }
+  }
+}
+
