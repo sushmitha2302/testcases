@@ -4,21 +4,21 @@ import {
   NATURAL_HAZARDS_WIND_ENABLED,
   AccType,
   CreateEarthMovementBarChart,
+  CreateWindBarChart,
 } from '@btp/shared-ui';
 import { RiskAccordion } from 'shared-ui/src/lib/RiskAccordion';
 import { useFlags } from 'launchdarkly-react-client-sdk';
 import { RdsBox, RdsText } from 'rds-components-react';
 import { useEffect, useState } from 'react';
-import { useFetchWindBarChartData } from 'src/hooks/useFetchWindBarChartData';
 import { useLocation, useNavigate } from 'react-router-dom';
 import NatHazFilters from 'src/NatHazDetails/NatHazFilters/NatHazFilters';
 import { useAccount } from 'src/common/contexts/AccountContext';
 import { useHeader } from 'src/common/contexts/HeaderContext';
 import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
 import { getNavigationUrl } from 'src/common/utils/navigationHelper';
+import useFetchWindBarChartData from 'src/hooks/useFetchWindBarChartData';
 import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
 import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
-import { createWindBarChartAndAccordion } from 'src/NatHazContainer/charts/WindChartFunctions';
 import { useFetchFloodTIVData } from 'src/hooks/useFetchFloodTIVData';
 import { createDataForCharts } from 'src/NatHazContainer/charts/utils';
 
@@ -29,13 +29,13 @@ export function NatHazOverview() {
   const [includeAccordion, setIncludeAccordion] = useState(true);
   const { EarthMovementAggregates } =
     useFetchEarthMovementBarAndAccordionData();
+  const { WindAggregates } = useFetchWindBarChartData();
   const { activeTab, setActiveTab, includeProspect, setIncludeProspect } =
     useHeader();
   const flags = useFlags();
   const floodEnabled = flags[NATURAL_HAZARDS_FLOOD_ENABLED];
   const windEnabled = flags[NATURAL_HAZARDS_WIND_ENABLED];
   const earthquakeEnabled = flags[NATURAL_HAZARDS_EARTHQUAKE_ENABLED];
-  const { windBarChartData } = useFetchWindBarChartData();
   const [perilData, setPerilData] = useState<AccType[]>([]);
   const { floodTIVDetails } = useFetchFloodTIVData();
   const handleTitleClick = (title: string) => {
@@ -99,13 +99,15 @@ export function NatHazOverview() {
       includeProspect,
       includeAccordion,
     );
-    const windCharts = includeProspect
-      ? createWindBarChartAndAccordion(windBarChartData)[0]
-      : createWindBarChartAndAccordion(windBarChartData)[1];
+    const windBarChart = CreateWindBarChart(
+      WindAggregates,
+      includeProspect,
+      includeAccordion,
+    );
     const chart = createDataForCharts(floodTIVDetails, includeProspect);
-    setPerilData([chart[0], earthMovementChart, windCharts]);
+    setPerilData([chart[0], earthMovementChart, windBarChart]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeProspect, EarthMovementAggregates]);
+  }, [includeProspect, EarthMovementAggregates, WindAggregates]);
 
   return (
     <RdsBox
