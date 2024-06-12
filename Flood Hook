@@ -1,0 +1,220 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  RiskStatus,
+  BarChart,
+  TableList,
+  convertToPercent,
+} from '@btp/shared-ui';
+import React from 'react';
+import { ColorThemes } from 'shared-ui/src/lib/Highcharts/BarChart/colorThemes';
+import { actionsMock, formatAmount } from '../../utils/utils';
+import {
+  FloodBarChartDTO,
+  FloodLocChartAgg,
+} from '../../Models/FloodBarchartDTO';
+
+export const getFloodAggData = (
+  aggData: FloodLocChartAgg[] | null | undefined,
+) => {
+  const highDataObj =
+    aggData && aggData?.find((el) => el?.flood_hazard_frequency === 'High');
+  const lowDataObj =
+    aggData && aggData?.find((el) => el?.flood_hazard_frequency === 'Low');
+  const reducedDataObj =
+    aggData && aggData.find((el) => el?.flood_hazard_frequency === 'Reduced');
+  const moderateDataObj =
+    aggData && aggData.find((el) => el?.flood_hazard_frequency === 'Moderate');
+
+  return {
+    highDataObj,
+    lowDataObj,
+    reducedDataObj,
+    moderateDataObj,
+  };
+};
+export const createActiveChartData = (
+  param: FloodBarChartDTO,
+  includeProspect: boolean,
+) => {
+  const {
+    highActive,
+    moderateActive,
+    reducedActive,
+    lowActive,
+    highProspect,
+    lowProspect,
+    reducedProspect,
+    moderateProspect,
+  } = param;
+
+  if (includeProspect) {
+    return [
+      {
+        label: 'High',
+        barValue: highActive || 0,
+        legendValue: formatAmount(highActive ?? 0),
+      },
+      {
+        label: 'High',
+        barValue: highProspect || 0,
+        pattern: true,
+        legendValue: formatAmount(highProspect ?? 0),
+      },
+      {
+        label: 'Moderate',
+        barValue: moderateActive || 0,
+        legendValue: formatAmount(moderateActive ?? 0),
+      },
+      {
+        label: 'Moderate',
+        barValue: moderateProspect || 0,
+        pattern: true,
+        legendValue: formatAmount(moderateProspect ?? 0),
+      },
+      {
+        label: 'Reduced',
+        barValue: reducedActive || 0,
+        legendValue: formatAmount(reducedActive ?? 0),
+      },
+      {
+        label: 'Reduced',
+        barValue: reducedProspect || 0,
+        pattern: true,
+        legendValue: formatAmount(reducedProspect ?? 0),
+      },
+      {
+        label: 'Low',
+        barValue: lowActive || 0,
+        legendValue: formatAmount(lowActive ?? 0),
+      },
+      {
+        label: 'Low',
+        barValue: lowProspect || 0,
+        pattern: true,
+        legendValue: formatAmount(lowProspect ?? 0),
+      },
+    ];
+  }
+  return [
+    {
+      label: 'High',
+      barValue: highActive || 0,
+      legendValue: formatAmount(highActive ?? 0),
+    },
+    {
+      label: 'Moderate',
+      barValue: moderateActive || 0,
+      legendValue: formatAmount(moderateActive ?? 0),
+    },
+    {
+      label: 'Reduced',
+      barValue: reducedActive || 0,
+      legendValue: formatAmount(reducedActive ?? 0),
+    },
+    {
+      label: 'Low',
+      barValue: lowActive || 0,
+      legendValue: formatAmount(lowActive ?? 0),
+    },
+  ];
+};
+
+export const floodColumnAccordionData = [
+  { key: 'floodHazard', header: 'Flood Hazard' },
+  { key: 'locationCount', header: 'Location Count' },
+  { key: 'tiv', header: 'TIV' },
+  { key: 'tivPercentage', header: 'TIV %' },
+  { key: 'hundredYearLoss', header: 'Total 100 Yr LE' },
+  { key: 'fiveHundredYearLoss', header: 'Total 500yr LE' },
+];
+
+export const createTableDataForAccordion = (
+  tivData: FloodBarChartDTO,
+  includeProspect: boolean,
+) => {
+  const { floodTivData, totalTIV, totalActiveTIV } = tivData;
+  const total = (includeProspect ? totalTIV : totalActiveTIV) ?? 0;
+  const floodTableData: {
+    floodHazard: string;
+    locationCount: number;
+    tiv: string;
+    tivPercentage: string;
+    hundredYearLoss: string;
+    fiveHundredYearLoss: string;
+  }[] = [];
+
+  floodTivData?.forEach((dataObj: FloodLocChartAgg) => {
+    const floodHazard = dataObj.flood_hazard_frequency;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { active_location_aggregates } = dataObj;
+    let locationCount = active_location_aggregates?.location_count ?? 0;
+    let tiv = dataObj?.active_location_aggregates?.total_insured_value ?? 0;
+    let tivPercentage = convertToPercent(tiv, total);
+    let hundredYearLoss =
+      dataObj?.active_location_aggregates?.hundred_year_loss_expectancy ?? 0;
+    let fiveHundredYearLoss =
+      dataObj?.active_location_aggregates?.five_hundred_year_loss_expectancy ??
+      0;
+    if (includeProspect) {
+      locationCount +=
+        dataObj?.prospect_location_aggregates?.location_count ?? 0;
+      tiv += dataObj?.prospect_location_aggregates?.total_insured_value ?? 0;
+      tivPercentage = convertToPercent(tiv, total);
+      hundredYearLoss +=
+        dataObj?.prospect_location_aggregates?.hundred_year_loss_expectancy ??
+        0;
+      fiveHundredYearLoss +=
+        dataObj?.prospect_location_aggregates
+          ?.five_hundred_year_loss_expectancy ?? 0;
+    }
+    if (locationCount) {
+      floodTableData.push({
+        floodHazard,
+        locationCount,
+        tiv: formatAmount(tiv),
+        tivPercentage,
+        hundredYearLoss: formatAmount(hundredYearLoss),
+        fiveHundredYearLoss: formatAmount(fiveHundredYearLoss),
+      });
+    }
+  });
+  return floodTableData;
+};
+
+export const CreateFloodBarChart = (
+  param: FloodBarChartDTO,
+  includeProspect: boolean,
+) => {
+  const { totalTIV, totalActiveTIV } = param;
+  const data = createActiveChartData(param, includeProspect);
+
+  const total = (includeProspect ? totalTIV : totalActiveTIV) ?? 0;
+  const floodChart = React.createElement(BarChart, {
+    barData: data,
+    total,
+    rightContent: [
+      {
+        value: formatAmount(total) ?? 0,
+        label: 'Total TIV',
+      },
+    ],
+    theme: includeProspect ? ColorThemes.Prospect : ColorThemes.Active,
+  });
+  const floodTableData = createTableDataForAccordion(param, includeProspect);
+
+  const floodTableList = React.createElement(TableList, {
+    tableTitle: 'Flood',
+    tableData: floodTableData,
+    columnData: floodColumnAccordionData,
+    actions: actionsMock,
+  });
+  return {
+    accTitle: 'Flood',
+    status: RiskStatus?.VERY_SEVERE,
+    accComp: floodChart,
+    accItemComp: floodTableList,
+  };
+};
+
+export default CreateFloodBarChart;
