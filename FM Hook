@@ -85,4 +85,3 @@ export const useFetchFloodBarAndAccordionData = () => {
 };
 
 export default useFetchFloodBarAndAccordionData;
-
