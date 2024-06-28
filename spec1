@@ -1,21 +1,15 @@
-import { render, screen } from '@testing-library/react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { ErrorFallback } from '../common/components/ErrorFallback';
-import { App } from './App';
-import { BtpTelemetry, BtpApolloProvider, LaunchDarklyContextProvider } from '@btp/shared-ui';
-import ContextProviders from 'src/common/contexts/ContextProviders';
-import MainLayout from 'src/common/components/MainLayout';
-import { MainRoutes } from 'src/routes/MainRoutes';
+import { ReactNode } from 'react';
 
+// Mock implementations
 jest.mock('@btp/shared-ui', () => ({
-  BtpTelemetry: ({ children }) => <div>{children}</div>,
-  BtpApolloProvider: ({ children }) => <div>{children}</div>,
-  LaunchDarklyContextProvider: ({ children }) => <div>{children}</div>,
+  BtpTelemetry: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  BtpApolloProvider: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  LaunchDarklyContextProvider: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   setupAggridLicense: jest.fn(),
 }));
 
-jest.mock('src/common/contexts/ContextProviders', () => ({ children }) => <div>{children}</div>);
-jest.mock('src/common/components/MainLayout', () => ({ children }) => <div>{children}</div>);
+jest.mock('src/common/contexts/ContextProviders', () => ({ children }: { children: ReactNode }) => <div>{children}</div>);
+jest.mock('src/common/components/MainLayout', () => ({ children }: { children: ReactNode }) => <div>{children}</div>);
 jest.mock('src/routes/MainRoutes', () => () => <div>MainRoutes</div>);
 
 describe('App', () => {
