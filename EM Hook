@@ -1,104 +1,250 @@
-import { useSuspenseQuery } from '@apollo/client';
-import { EarthMovementBarchartDTO } from '@btp/shared-ui';
-import { useMemo } from 'react';
+import {
+  NATURAL_HAZARDS_EARTHQUAKE_ENABLED,
+  NATURAL_HAZARDS_FLOOD_ENABLED,
+  NATURAL_HAZARDS_WIND_ENABLED,
+  AccType,
+  CreateEarthMovementBarChart,
+  CreateFloodBarChart,
+  CreateWindBarChart,
+} from '@btp/shared-ui';
+import { useFlags } from 'launchdarkly-react-client-sdk';
+import { RdsBox } from 'rds-components-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import NatHazFilters from 'src/NatHazDetails/NatHazFilters/NatHazFilters';
 import { useAccount } from 'src/common/contexts/AccountContext';
 import { useHeader } from 'src/common/contexts/HeaderContext';
-import { convertDateToJson } from 'src/mappers/natHazMappers';
-import {
-  BtpNaturalHazards_GetEarthMovementAggregates_V02Document,
-  BtpNaturalHazards_GetEarthMovementAggregates_V02Query,
-} from 'src/models';
+import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
+import { getNavigationUrl } from 'src/common/utils/navigationHelper';
+import useFetchWindBarAndAccordionData from 'src/hooks/useFetchWindBarChartData';
+import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
+import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
+import { useFetchFloodBarAndAccordionData } from 'src/hooks/useFetchFloodBarData';
+import { NatHazPerilAccordion } from './NatHazPerilAccordion/NatHazPerilAccordion';
 
-const FetchEarthMovementBarAndAccordionDetails = (
-  orgid: number,
-  date: Date | null,
-  selectedCurrency: number | null,
-) => {
-  const { data, error } =
-    useSuspenseQuery<BtpNaturalHazards_GetEarthMovementAggregates_V02Query>(
-      BtpNaturalHazards_GetEarthMovementAggregates_V02Document,
-      {
-        variables: {
-          org_prospect_client_id: orgid,
-          as_of_date: convertDateToJson(date),
-          context_currency_type_id: selectedCurrency,
-        },
-      },
-    );
-  return { data, error };
+export type PerilError = {
+  peril: NatHazModuleUrlRouteEnum;
+  errorState: boolean;
+  traceId: string | null | undefined;
+  onTryAgainAction: () => void;
 };
-
-export const useFetchEarthMovementBarAndAccordionData = () => {
+export function NatHazOverview() {
   const { accountDetails } = useAccount();
-  const { selectedCurrency, asofDate } = useHeader();
-  const { orgid } = accountDetails;
-  const { data, error } = FetchEarthMovementBarAndAccordionDetails(
-    +orgid,
+  const [numPerilLoading, setNumPerilLoading] = useState(0);
+  const [perilErrors, setPerilErrors] = useState<PerilError[]>([]);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const {
+    EarthMovementAttributes,
+    loading: EarthMovementAttributesLoading,
+    errorCode: EarthMovementAttributesError,
+    refetch: earthMovementRefetch,
+  } = useFetchEarthMovementBarAndAccordionData();
+  const {
+    WindAttributes,
+    loading: WindAttributesLoading,
+    errorCode: WindAttributesError,
+    refetch: windRefetch,
+  } = useFetchWindBarAndAccordionData();
+  const {
+    activeTab,
+    setActiveTab,
+    includeProspect,
+    setIncludeProspect,
     asofDate,
-    selectedCurrency,
-  );
+  } = useHeader();
+  const flags = useFlags();
+  const {
+    FloodAttributes,
+    loading: FloodAttributesLoading,
+    errorCode: FloodAttributesError,
+    refetch: floodRefetch,
+  } = useFetchFloodBarAndAccordionData();
 
-  return useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const earthMovementAggregates: any =
-      data?.btp_natural_hazards?.earth_movement_aggregates;
-    const EarthMovementAggregates: EarthMovementBarchartDTO = {
-      as_of_date: earthMovementAggregates?.as_of_date,
-      currency_type_id: earthMovementAggregates?.currency_type_id,
-      org_prospect_client_id: earthMovementAggregates?.org_prospect_client_id,
-      totalLocationCount:
-        earthMovementAggregates.locations_aggregate?.location_count,
-      totalTIV:
-        earthMovementAggregates.locations_aggregate?.total_insured_value,
-      totalActiveLocationCount:
-        earthMovementAggregates.active_locations_aggregate?.location_count,
-      totalActiveTIV:
-        earthMovementAggregates.active_locations_aggregate?.total_insured_value,
-      earthquake_frequency_zone_aggregates:
-        earthMovementAggregates?.earthquake_frequency_zone_aggregates?.map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (aggregate: any) => {
-            const res = {
-              zoneCode: aggregate?.earthquake_frequency_zone_code,
-              zoneDescription: aggregate?.earthquake_frequency_zone_description,
-              totalLocationCount:
-                aggregate?.locations_aggregate?.location_count,
-              totalTIV: aggregate?.locations_aggregate?.total_insured_value,
-              activeLocationCount:
-                aggregate?.active_locations_aggregate?.location_count,
-              activeTIV:
-                aggregate?.active_locations_aggregate?.total_insured_value,
-            };
-            return res;
-          },
-        ),
-      earthquake_region_aggregates:
-        earthMovementAggregates?.earthquake_region_aggregates?.map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (aggregate: any) => {
-            const res = {
-              regionCode: aggregate?.earthquake_region_code,
-              regionDescription: aggregate?.earthquake_region_description,
-              totalLocationCount:
-                aggregate?.locations_aggregate?.location_count,
-              totalTIV: aggregate?.locations_aggregate?.total_insured_value,
-              activeLocationCount:
-                aggregate?.active_locations_aggregate?.location_count,
-              activeTIV:
-                aggregate?.active_locations_aggregate?.total_insured_value,
-            };
-            return res;
-          },
-        ),
-    };
+  const floodEnabled = flags[NATURAL_HAZARDS_FLOOD_ENABLED];
+  const windEnabled = flags[NATURAL_HAZARDS_WIND_ENABLED];
+  const earthquakeEnabled = flags[NATURAL_HAZARDS_EARTHQUAKE_ENABLED];
+  const [perilData, setPerilData] = useState<AccType[]>([]);
+  const handleTitleClick = (title: string) => {
+    let pageUrl: string = '';
+    switch (title) {
+      case 'Flood':
+        pageUrl = floodEnabled ? NatHazModuleUrlRouteEnum.FLOODURL : '';
+        break;
+      case 'Wind':
+        pageUrl = windEnabled ? NatHazModuleUrlRouteEnum.WINDURL : '';
+        break;
+      case 'Earth Movement':
+        pageUrl = earthquakeEnabled ? NatHazModuleUrlRouteEnum.EARTHURL : '';
+        break;
+      default:
+        break;
+    }
+    if (pageUrl) {
+      navigate(
+        getNavigationUrl({
+          locationPath: pathname,
+          orgId: accountDetails.orgid,
+          pageUrl,
+        }),
+      );
+    }
+  };
 
-    const payload = {
-      EarthMovementAggregates,
-      error,
-    };
-    return payload;
+  const updatedPerilData: AccType[] = perilData
+    ?.map((item) => {
+      if (
+        (item.accTitle === 'Flood' && floodEnabled) ||
+        (item.accTitle === 'Wind' && windEnabled) ||
+        (item.accTitle === 'Earth Movement' && earthquakeEnabled)
+      ) {
+        return {
+          ...item,
+          onTitleClick: (title: string) => handleTitleClick(title),
+        };
+      }
+      return {
+        accTitle: '',
+      };
+    })
+    .filter((item) => item.accTitle !== '');
+
+  useEffect(() => {
+    if (
+      (pathname.endsWith(`${accountDetails.orgid}`) ||
+        pathname.endsWith(`${accountDetails.orgid}/`)) &&
+      activeTab !== 0
+    ) {
+      setActiveTab(0);
+    }
+  }, [accountDetails.orgid, activeTab, pathname, setActiveTab]);
+
+  useEffect(() => {
+    const loadingStates = [
+      FloodAttributesLoading && floodEnabled,
+      WindAttributesLoading && windEnabled,
+      EarthMovementAttributesLoading && earthquakeEnabled,
+    ];
+
+    setNumPerilLoading(
+      loadingStates.reduce(
+        (count, isLoading) => count + (isLoading ? 1 : 0),
+        0,
+      ),
+    );
+
+    const chartArr: AccType[] = [];
+    if (
+      floodEnabled &&
+      FloodAttributes !== null &&
+      !FloodAttributesLoading &&
+      !FloodAttributesError
+    ) {
+      const floodChart = CreateFloodBarChart(FloodAttributes, includeProspect);
+      chartArr.push(floodChart);
+    }
+    if (
+      earthquakeEnabled &&
+      EarthMovementAttributes !== null &&
+      !EarthMovementAttributesLoading &&
+      !EarthMovementAttributesError
+    ) {
+      const earthMovementChart = CreateEarthMovementBarChart(
+        EarthMovementAttributes,
+        includeProspect,
+      );
+      chartArr.push(earthMovementChart);
+    }
+
+    if (
+      windEnabled &&
+      WindAttributes !== null &&
+      !WindAttributesLoading &&
+      !WindAttributesError
+    ) {
+      const windBarChart = CreateWindBarChart(WindAttributes, includeProspect);
+      chartArr.push(windBarChart);
+    }
+
+    const errorStates = [
+      {
+        peril: NatHazModuleUrlRouteEnum.FLOODURL,
+        errorState:
+          floodEnabled &&
+          !FloodAttributesLoading &&
+          FloodAttributesError !== null,
+        traceId: FloodAttributesError,
+        onTryAgainAction: floodRefetch,
+      },
+      {
+        peril: NatHazModuleUrlRouteEnum.EARTHURL,
+        errorState:
+          earthquakeEnabled &&
+          !EarthMovementAttributesLoading &&
+          EarthMovementAttributesError !== null,
+        traceId: EarthMovementAttributesError,
+        onTryAgainAction: earthMovementRefetch,
+      },
+      {
+        peril: NatHazModuleUrlRouteEnum.WINDURL,
+        errorState:
+          windEnabled && !WindAttributesLoading && WindAttributesError !== null,
+        traceId: WindAttributesError,
+        onTryAgainAction: windRefetch,
+      },
+    ];
+
+    setPerilErrors(errorStates);
+    setPerilData(chartArr);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCurrency, asofDate, data, error]);
-};
+  }, [
+    floodEnabled,
+    earthquakeEnabled,
+    windEnabled,
+    FloodAttributesLoading,
+    EarthMovementAttributesLoading,
+    WindAttributesLoading,
+    includeProspect,
+    FloodAttributes,
+    WindAttributes,
+    EarthMovementAttributes,
+    FloodAttributesError,
+    EarthMovementAttributesError,
+    WindAttributesError,
+  ]);
 
-export default useFetchEarthMovementBarAndAccordionData;
+  return (
+    <RdsBox
+      className="w-full h-full overflow-auto"
+      data-testid="overview"
+      height="calc(100vh - 4rem)"
+    >
+      <div className="flex flex-row">
+        <div className="flex flex-row flex-grow">
+          <div className="flex-grow pb-4">
+            <NatHazFilters
+              includeProspect={includeProspect}
+              setIncludeProspect={setIncludeProspect}
+              asofDate={asofDate}
+              isOverview
+            />
+            <NatHazPerilAccordion
+              perilData={updatedPerilData}
+              loadingCount={numPerilLoading}
+              errorStates={perilErrors}
+            />
+          </div>
+        </div>
+        <RdsBox
+          className="flex-shrink-0 h-full overflow-auto"
+          height="calc(100vh - 4rem)"
+        >
+          <RightUtilityBar />
+        </RdsBox>
+      </div>
+    </RdsBox>
+  );
+}
+
+export default NatHazOverview;
