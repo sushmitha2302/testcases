@@ -1,250 +1,119 @@
+import { Suspense, useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import LoadingComp from 'src/common/components/LoadingComp';
+import MainLayout from 'src/common/components/MainLayout';
+import ContextProviders from 'src/common/contexts/ContextProviders';
 import {
-  NATURAL_HAZARDS_EARTHQUAKE_ENABLED,
-  NATURAL_HAZARDS_FLOOD_ENABLED,
-  NATURAL_HAZARDS_WIND_ENABLED,
-  AccType,
-  CreateEarthMovementBarChart,
-  CreateFloodBarChart,
-  CreateWindBarChart,
+  BTP_NATURAL_HAZARDS_ACCESS_ROLES,
+  permissionsTable,
+} from 'src/common/utils/x-hasura-role';
+import { MainRoutes } from 'src/routes/MainRoutes';
+import { TypePolicies } from '@apollo/client';
+// Importing this here to initialize i18next - it is here instead of in main.ts due to module federation
+import {
+  BtpApolloProvider,
+  BtpTelemetry,
+  LaunchDarklyContextProvider,
+  PlatformProps,
+  setupAggridLicense,
 } from '@btp/shared-ui';
-import { useFlags } from 'launchdarkly-react-client-sdk';
-import { RdsBox } from 'rds-components-react';
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import NatHazFilters from 'src/NatHazDetails/NatHazFilters/NatHazFilters';
-import { useAccount } from 'src/common/contexts/AccountContext';
-import { useHeader } from 'src/common/contexts/HeaderContext';
-import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
-import { getNavigationUrl } from 'src/common/utils/navigationHelper';
-import useFetchWindBarAndAccordionData from 'src/hooks/useFetchWindBarChartData';
-import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
-import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
-import { useFetchFloodBarAndAccordionData } from 'src/hooks/useFetchFloodBarData';
-import { NatHazPerilAccordion } from './NatHazPerilAccordion/NatHazPerilAccordion';
 
-export type PerilError = {
-  peril: NatHazModuleUrlRouteEnum;
-  errorState: boolean;
-  traceId: string | null | undefined;
-  onTryAgainAction: () => void;
+import { TelemetryLogLevel } from 'shared-ui/src/lib/BtpTelemetry';
+import { ErrorFallback } from '../common/components/ErrorFallback';
+
+// Import the global styles - needed for module federation
+import '../styles.scss';
+
+import './app.module.scss';
+
+setupAggridLicense();
+
+const typePolicies: TypePolicies = {
+  Query: {
+    fields: {
+      latest_prospect_clients: {
+        keyArgs: ['where'],
+        // The incoming can be any type (as recommended by the docs)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        merge(existing, incoming: any[], { mergeObjects }) {
+          // If there's no data, replace the cache
+          // If the data doesn't align with what is expected, replace the cache
+          if (existing?.length !== 1 || incoming?.length !== 1) {
+            return incoming;
+          }
+          return [
+            {
+              ...mergeObjects(existing[0], incoming[0]),
+            },
+          ];
+        },
+      },
+
+      btp_natural_hazards: {
+        merge: true,
+      },
+    },
+  },
 };
-export function NatHazOverview() {
-  const { accountDetails } = useAccount();
-  const [numPerilLoading, setNumPerilLoading] = useState(0);
-  const [perilErrors, setPerilErrors] = useState<PerilError[]>([]);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const {
-    EarthMovementAttributes,
-    loading: EarthMovementAttributesLoading,
-    errorCode: EarthMovementAttributesError,
-    refetch: earthMovementRefetch,
-  } = useFetchEarthMovementBarAndAccordionData();
-  const {
-    WindAttributes,
-    loading: WindAttributesLoading,
-    errorCode: WindAttributesError,
-    refetch: windRefetch,
-  } = useFetchWindBarAndAccordionData();
-  const {
-    activeTab,
-    setActiveTab,
-    includeProspect,
-    setIncludeProspect,
-    asofDate,
-  } = useHeader();
-  const flags = useFlags();
-  const {
-    FloodAttributes,
-    loading: FloodAttributesLoading,
-    errorCode: FloodAttributesError,
-    refetch: floodRefetch,
-  } = useFetchFloodBarAndAccordionData();
 
-  const floodEnabled = flags[NATURAL_HAZARDS_FLOOD_ENABLED];
-  const windEnabled = flags[NATURAL_HAZARDS_WIND_ENABLED];
-  const earthquakeEnabled = flags[NATURAL_HAZARDS_EARTHQUAKE_ENABLED];
-  const [perilData, setPerilData] = useState<AccType[]>([]);
-  const handleTitleClick = (title: string) => {
-    let pageUrl: string = '';
-    switch (title) {
-      case 'Flood':
-        pageUrl = floodEnabled ? NatHazModuleUrlRouteEnum.FLOODURL : '';
-        break;
-      case 'Wind':
-        pageUrl = windEnabled ? NatHazModuleUrlRouteEnum.WINDURL : '';
-        break;
-      case 'Earth Movement':
-        pageUrl = earthquakeEnabled ? NatHazModuleUrlRouteEnum.EARTHURL : '';
-        break;
-      default:
-        break;
-    }
-    if (pageUrl) {
-      navigate(
-        getNavigationUrl({
-          locationPath: pathname,
-          orgId: accountDetails.orgid,
-          pageUrl,
-        }),
-      );
-    }
-  };
+export function App({ useSetPlatformState }: Readonly<PlatformProps>) {
+  const { setPlatformConfiguration } = useSetPlatformState();
 
-  const updatedPerilData: AccType[] = perilData
-    ?.map((item) => {
-      if (
-        (item.accTitle === 'Flood' && floodEnabled) ||
-        (item.accTitle === 'Wind' && windEnabled) ||
-        (item.accTitle === 'Earth Movement' && earthquakeEnabled)
-      ) {
-        return {
-          ...item,
-          onTitleClick: (title: string) => handleTitleClick(title),
-        };
-      }
-      return {
-        accTitle: '',
-      };
-    })
-    .filter((item) => item.accTitle !== '');
+  useEffect(
+    () =>
+      setPlatformConfiguration({
+        accountSelector: false,
+        header: false,
+        navigation: false,
+      }),
+    [setPlatformConfiguration],
+  );
 
-  useEffect(() => {
-    if (
-      (pathname.endsWith(`${accountDetails.orgid}`) ||
-        pathname.endsWith(`${accountDetails.orgid}/`)) &&
-      activeTab !== 0
-    ) {
-      setActiveTab(0);
-    }
-  }, [accountDetails.orgid, activeTab, pathname, setActiveTab]);
+  const availableBtpRoles = BTP_NATURAL_HAZARDS_ACCESS_ROLES;
 
-  useEffect(() => {
-    const loadingStates = [
-      FloodAttributesLoading && floodEnabled,
-      WindAttributesLoading && windEnabled,
-      EarthMovementAttributesLoading && earthquakeEnabled,
-    ];
-
-    setNumPerilLoading(
-      loadingStates.reduce(
-        (count, isLoading) => count + (isLoading ? 1 : 0),
-        0,
-      ),
-    );
-
-    const chartArr: AccType[] = [];
-    if (
-      floodEnabled &&
-      FloodAttributes !== null &&
-      !FloodAttributesLoading &&
-      !FloodAttributesError
-    ) {
-      const floodChart = CreateFloodBarChart(FloodAttributes, includeProspect);
-      chartArr.push(floodChart);
-    }
-    if (
-      earthquakeEnabled &&
-      EarthMovementAttributes !== null &&
-      !EarthMovementAttributesLoading &&
-      !EarthMovementAttributesError
-    ) {
-      const earthMovementChart = CreateEarthMovementBarChart(
-        EarthMovementAttributes,
-        includeProspect,
-      );
-      chartArr.push(earthMovementChart);
-    }
-
-    if (
-      windEnabled &&
-      WindAttributes !== null &&
-      !WindAttributesLoading &&
-      !WindAttributesError
-    ) {
-      const windBarChart = CreateWindBarChart(WindAttributes, includeProspect);
-      chartArr.push(windBarChart);
-    }
-
-    const errorStates = [
-      {
-        peril: NatHazModuleUrlRouteEnum.FLOODURL,
-        errorState:
-          floodEnabled &&
-          !FloodAttributesLoading &&
-          FloodAttributesError !== null,
-        traceId: FloodAttributesError,
-        onTryAgainAction: floodRefetch,
-      },
-      {
-        peril: NatHazModuleUrlRouteEnum.EARTHURL,
-        errorState:
-          earthquakeEnabled &&
-          !EarthMovementAttributesLoading &&
-          EarthMovementAttributesError !== null,
-        traceId: EarthMovementAttributesError,
-        onTryAgainAction: earthMovementRefetch,
-      },
-      {
-        peril: NatHazModuleUrlRouteEnum.WINDURL,
-        errorState:
-          windEnabled && !WindAttributesLoading && WindAttributesError !== null,
-        traceId: WindAttributesError,
-        onTryAgainAction: windRefetch,
-      },
-    ];
-
-    setPerilErrors(errorStates);
-    setPerilData(chartArr);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    floodEnabled,
-    earthquakeEnabled,
-    windEnabled,
-    FloodAttributesLoading,
-    EarthMovementAttributesLoading,
-    WindAttributesLoading,
-    includeProspect,
-    FloodAttributes,
-    WindAttributes,
-    EarthMovementAttributes,
-    FloodAttributesError,
-    EarthMovementAttributesError,
-    WindAttributesError,
-  ]);
+  const fallbackURL = 'http://localhost:8080/v1/graphql';
 
   return (
-    <RdsBox
-      className="w-full h-full overflow-auto"
-      data-testid="overview"
-      height="calc(100vh - 4rem)"
-    >
-      <div className="flex flex-row">
-        <div className="flex flex-row flex-grow">
-          <div className="flex-grow pb-4">
-            <NatHazFilters
-              includeProspect={includeProspect}
-              setIncludeProspect={setIncludeProspect}
-              asofDate={asofDate}
-              isOverview
-            />
-            <NatHazPerilAccordion
-              perilData={updatedPerilData}
-              loadingCount={numPerilLoading}
-              errorStates={perilErrors}
-            />
-          </div>
-        </div>
-        <RdsBox
-          className="flex-shrink-0 h-full overflow-auto"
-          height="calc(100vh - 4rem)"
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <BtpTelemetry
+        serviceName={process.env.NX_DYNATRACE_APP_NAME as string}
+        environment={process.env.NX_DYNATRACE_ENVIRONMENT as string}
+        localOnlyMode={process.env.NX_DYNATRACE_IS_LOCAL_ONLY === 'true'}
+        allowedTraceUrls={[
+          process.env.NX_REACT_APP_GRAPHQL_API_URL as unknown as RegExp,
+        ]}
+        minimumLogLevel={
+          process.env
+            .NX_DYNATRACE_MINIMUM_LOG_LEVEL as unknown as TelemetryLogLevel
+        }
+        logToConsole={process.env.NX_DYNATRACE_LOG_TO_CONSOLE === 'true'}
+      >
+        <BtpApolloProvider
+          casUrl={process.env.NX_CAS_API_URL ?? ''}
+          clientName={process.env.NX_REACT_APP_APPLICATION_NAME ?? ''}
+          hasuraUrl={process.env.NX_REACT_APP_GRAPHQL_API_URL || fallbackURL}
+          organizationRoles={availableBtpRoles}
+          queryToRoleMap={permissionsTable}
+          rolesLoadingComponent={<LoadingComp />}
+          shouldUseMockCAS={process.env.NX_CAS_USE_MOCK_AUTH === 'true'}
+          shouldUsePlainId
+          cacheTypePolicies={typePolicies}
         >
-          <RightUtilityBar />
-        </RdsBox>
-      </div>
-    </RdsBox>
+          <LaunchDarklyContextProvider>
+            <Suspense fallback={<LoadingComp />}>
+              <ContextProviders>
+                <MainLayout>
+                  <Suspense fallback={<LoadingComp />}>
+                    <MainRoutes />
+                  </Suspense>
+                </MainLayout>
+              </ContextProviders>
+            </Suspense>
+          </LaunchDarklyContextProvider>
+        </BtpApolloProvider>
+      </BtpTelemetry>
+    </ErrorBoundary>
   );
 }
 
-export default NatHazOverview;
+export default App;
