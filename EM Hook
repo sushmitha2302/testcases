@@ -1,119 +1,148 @@
-import { Suspense, useEffect } from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import LoadingComp from 'src/common/components/LoadingComp';
-import MainLayout from 'src/common/components/MainLayout';
-import ContextProviders from 'src/common/contexts/ContextProviders';
+import { useQuery } from '@apollo/client';
+import { EarthMovementBarchartDTO } from '@btp/shared-ui';
+import { useMemo } from 'react';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { projectErrorCode } from 'src/common/utils/projectErrorCode';
+import { convertDateToJson } from 'src/mappers/natHazMappers';
 import {
-  BTP_NATURAL_HAZARDS_ACCESS_ROLES,
-  permissionsTable,
-} from 'src/common/utils/x-hasura-role';
-import { MainRoutes } from 'src/routes/MainRoutes';
-import { TypePolicies } from '@apollo/client';
-// Importing this here to initialize i18next - it is here instead of in main.ts due to module federation
-import {
-  BtpApolloProvider,
-  BtpTelemetry,
-  LaunchDarklyContextProvider,
-  PlatformProps,
-  setupAggridLicense,
-} from '@btp/shared-ui';
+  BtpNaturalHazards_GetEarthMovementAttributes_V01Document,
+  BtpNaturalHazards_GetEarthMovementAttributes_V01Query,
+} from 'src/models';
 
-import { TelemetryLogLevel } from 'shared-ui/src/lib/BtpTelemetry';
-import { ErrorFallback } from '../common/components/ErrorFallback';
-
-// Import the global styles - needed for module federation
-import '../styles.scss';
-
-import './app.module.scss';
-
-setupAggridLicense();
-
-const typePolicies: TypePolicies = {
-  Query: {
-    fields: {
-      latest_prospect_clients: {
-        keyArgs: ['where'],
-        // The incoming can be any type (as recommended by the docs)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        merge(existing, incoming: any[], { mergeObjects }) {
-          // If there's no data, replace the cache
-          // If the data doesn't align with what is expected, replace the cache
-          if (existing?.length !== 1 || incoming?.length !== 1) {
-            return incoming;
-          }
-          return [
-            {
-              ...mergeObjects(existing[0], incoming[0]),
-            },
-          ];
-        },
-      },
-
-      btp_natural_hazards: {
-        merge: true,
-      },
-    },
-  },
-};
-
-export function App({ useSetPlatformState }: Readonly<PlatformProps>) {
-  const { setPlatformConfiguration } = useSetPlatformState();
-
-  useEffect(
-    () =>
-      setPlatformConfiguration({
-        accountSelector: false,
-        header: false,
-        navigation: false,
-      }),
-    [setPlatformConfiguration],
-  );
-
-  const availableBtpRoles = BTP_NATURAL_HAZARDS_ACCESS_ROLES;
-
-  const fallbackURL = 'http://localhost:8080/v1/graphql';
-
-  return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <BtpTelemetry
-        serviceName={process.env.NX_DYNATRACE_APP_NAME as string}
-        environment={process.env.NX_DYNATRACE_ENVIRONMENT as string}
-        localOnlyMode={process.env.NX_DYNATRACE_IS_LOCAL_ONLY === 'true'}
-        allowedTraceUrls={[
-          process.env.NX_REACT_APP_GRAPHQL_API_URL as unknown as RegExp,
-        ]}
-        minimumLogLevel={
-          process.env
-            .NX_DYNATRACE_MINIMUM_LOG_LEVEL as unknown as TelemetryLogLevel
-        }
-        logToConsole={process.env.NX_DYNATRACE_LOG_TO_CONSOLE === 'true'}
-      >
-        <BtpApolloProvider
-          casUrl={process.env.NX_CAS_API_URL ?? ''}
-          clientName={process.env.NX_REACT_APP_APPLICATION_NAME ?? ''}
-          hasuraUrl={process.env.NX_REACT_APP_GRAPHQL_API_URL || fallbackURL}
-          organizationRoles={availableBtpRoles}
-          queryToRoleMap={permissionsTable}
-          rolesLoadingComponent={<LoadingComp />}
-          shouldUseMockCAS={process.env.NX_CAS_USE_MOCK_AUTH === 'true'}
-          shouldUsePlainId
-          cacheTypePolicies={typePolicies}
-        >
-          <LaunchDarklyContextProvider>
-            <Suspense fallback={<LoadingComp />}>
-              <ContextProviders>
-                <MainLayout>
-                  <Suspense fallback={<LoadingComp />}>
-                    <MainRoutes />
-                  </Suspense>
-                </MainLayout>
-              </ContextProviders>
-            </Suspense>
-          </LaunchDarklyContextProvider>
-        </BtpApolloProvider>
-      </BtpTelemetry>
-    </ErrorBoundary>
-  );
+export interface EarthMovementBarDataResponse {
+  EarthMovementAttributes: EarthMovementBarchartDTO | null;
+  loading: boolean;
+  errorCode?: string | null;
+  refetch: () => void;
 }
 
-export default App;
+const FetchEarthMovementBarAndAccordionDetails = (
+  orgid: number,
+  date: Date | null,
+  selectedCurrency: number | null,
+) => {
+  const { data, loading, error, refetch } =
+    useQuery<BtpNaturalHazards_GetEarthMovementAttributes_V01Query>(
+      BtpNaturalHazards_GetEarthMovementAttributes_V01Document,
+      {
+        variables: {
+          org_prospect_client_id: orgid,
+          as_of_date: convertDateToJson(date),
+          context_currency_type_id: selectedCurrency,
+        },
+        errorPolicy: 'all',
+        notifyOnNetworkStatusChange: true,
+      },
+    );
+  return { data, loading, error, refetch };
+};
+
+export const useFetchEarthMovementBarAndAccordionData =
+  (): EarthMovementBarDataResponse => {
+    const { accountDetails } = useAccount();
+    const { selectedCurrency, asofDate } = useHeader();
+    const { orgid } = accountDetails;
+    const { data, loading, error, refetch } =
+      FetchEarthMovementBarAndAccordionDetails(
+        +orgid,
+        asofDate,
+        selectedCurrency,
+      );
+
+    return useMemo(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const earthMovementAttributes: any =
+        data?.btp_natural_hazards?.earth_movement_attributes;
+      const EarthMovementAttributes: EarthMovementBarchartDTO | null =
+        !data || !earthMovementAttributes
+          ? null
+          : {
+              as_of_date: earthMovementAttributes?.as_of_date,
+              currency_type_id: earthMovementAttributes?.currency_type_id,
+              org_prospect_client_id:
+                earthMovementAttributes?.org_prospect_client_id,
+              totalLocationCount:
+                earthMovementAttributes?.earth_movement_aggregates
+                  ?.locations_aggregate?.location_count ?? 0,
+              totalTIV:
+                earthMovementAttributes?.earth_movement_aggregates
+                  ?.locations_aggregate?.total_insured_value ?? 0,
+              totalActiveLocationCount:
+                earthMovementAttributes?.earth_movement_aggregates
+                  ?.active_locations_aggregate?.location_count ?? 0,
+              totalActiveTIV:
+                earthMovementAttributes?.earth_movement_aggregates
+                  ?.active_locations_aggregate?.total_insured_value ?? 0,
+              earthquake_frequency_zone_aggregates:
+                earthMovementAttributes?.earth_movement_aggregates?.earthquake_frequency_zone_aggregates?.map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (attribute: any) => {
+                    const res = {
+                      zoneCode: attribute?.earthquake_frequency_zone_code,
+                      zoneDescription:
+                        attribute?.earthquake_frequency_zone_description,
+                      totalLocationCount:
+                        attribute?.locations_aggregate?.location_count ?? 0,
+                      totalTIV:
+                        attribute?.locations_aggregate?.total_insured_value ??
+                        0,
+                      activeLocationCount:
+                        attribute?.active_locations_aggregate?.location_count ??
+                        0,
+                      activeTIV:
+                        attribute?.active_locations_aggregate
+                          ?.total_insured_value ?? 0,
+                      prospectTIV:
+                        attribute?.prospect_locations_aggregate
+                          ?.total_insured_value ?? 0,
+                      prospectLocationCount:
+                        attribute?.prospect_locations_aggregate
+                          ?.total_insured_value ?? 0,
+                    };
+                    return res;
+                  },
+                ),
+              earthquake_region_aggregates:
+                earthMovementAttributes?.earth_movement_aggregates?.earthquake_region_aggregates?.map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (attribute: any) => {
+                    const res = {
+                      regionCode: attribute?.earthquake_region_code,
+                      regionDescription:
+                        attribute?.earthquake_region_description,
+                      totalLocationCount:
+                        attribute?.locations_aggregate?.location_count ?? 0,
+                      totalTIV:
+                        attribute?.locations_aggregate?.total_insured_value ??
+                        0,
+                      activeLocationCount:
+                        attribute?.active_locations_aggregate?.location_count ??
+                        0,
+                      activeTIV:
+                        attribute?.active_locations_aggregate
+                          ?.total_insured_value ?? 0,
+                    };
+                    return res;
+                  },
+                ),
+              riskQuality:
+                earthMovementAttributes?.earth_movement_risk_details
+                  ?.risk_status?.risk_quality,
+              activeLocationsRiskQuality:
+                earthMovementAttributes?.earth_movement_risk_details
+                  ?.active_locations_risk_status?.risk_quality,
+            };
+
+      const payload = {
+        EarthMovementAttributes,
+        loading,
+        errorCode: projectErrorCode(error?.graphQLErrors),
+        refetch: () => refetch(),
+      };
+      return payload;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data, loading, error, refetch]);
+  };
+
+export default useFetchEarthMovementBarAndAccordionData;
