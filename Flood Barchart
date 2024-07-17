@@ -1,220 +1,137 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  RiskStatus,
-  BarChart,
-  TableList,
-  convertToPercent,
-} from '@btp/shared-ui';
-import React from 'react';
-import { ColorThemes } from 'shared-ui/src/lib/Highcharts/BarChart/colorThemes';
-import { actionsMock, formatAmount } from '../../utils/utils';
-import {
-  FloodBarChartDTO,
-  FloodLocChartAgg,
-} from '../../Models/FloodBarchartDTO';
+import { render, screen } from '@testing-library/react';
+import { useQuery } from '@apollo/client';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import PrescreeningMap from '..';
+import NatHazMap from '../../NatHazMap';
+import { LocationPinData } from 'src/common/interfaces/interfaces';
 
-export const getFloodAggData = (
-  aggData: FloodLocChartAgg[] | null | undefined,
-) => {
-  const highDataObj =
-    aggData && aggData?.find((el) => el?.flood_hazard_frequency === 'High');
-  const lowDataObj =
-    aggData && aggData?.find((el) => el?.flood_hazard_frequency === 'Low');
-  const reducedDataObj =
-    aggData && aggData.find((el) => el?.flood_hazard_frequency === 'Reduced');
-  const moderateDataObj =
-    aggData && aggData.find((el) => el?.flood_hazard_frequency === 'Moderate');
-
-  return {
-    highDataObj,
-    lowDataObj,
-    reducedDataObj,
-    moderateDataObj,
-  };
-};
-export const createActiveChartData = (
-  param: FloodBarChartDTO,
-  includeProspect: boolean,
-) => {
-  const {
-    highActive,
-    moderateActive,
-    reducedActive,
-    lowActive,
-    highProspect,
-    lowProspect,
-    reducedProspect,
-    moderateProspect,
-  } = param;
-
-  if (includeProspect) {
-    return [
-      {
-        label: 'High',
-        barValue: highActive || 0,
-        legendValue: formatAmount(highActive ?? 0),
-      },
-      {
-        label: 'High',
-        barValue: highProspect || 0,
-        pattern: true,
-        legendValue: formatAmount(highProspect ?? 0),
-      },
-      {
-        label: 'Moderate',
-        barValue: moderateActive || 0,
-        legendValue: formatAmount(moderateActive ?? 0),
-      },
-      {
-        label: 'Moderate',
-        barValue: moderateProspect || 0,
-        pattern: true,
-        legendValue: formatAmount(moderateProspect ?? 0),
-      },
-      {
-        label: 'Reduced',
-        barValue: reducedActive || 0,
-        legendValue: formatAmount(reducedActive ?? 0),
-      },
-      {
-        label: 'Reduced',
-        barValue: reducedProspect || 0,
-        pattern: true,
-        legendValue: formatAmount(reducedProspect ?? 0),
-      },
-      {
-        label: 'Low',
-        barValue: lowActive || 0,
-        legendValue: formatAmount(lowActive ?? 0),
-      },
-      {
-        label: 'Low',
-        barValue: lowProspect || 0,
-        pattern: true,
-        legendValue: formatAmount(lowProspect ?? 0),
-      },
-    ];
-  }
-  return [
-    {
-      label: 'High',
-      barValue: highActive || 0,
-      legendValue: formatAmount(highActive ?? 0),
-    },
-    {
-      label: 'Moderate',
-      barValue: moderateActive || 0,
-      legendValue: formatAmount(moderateActive ?? 0),
-    },
-    {
-      label: 'Reduced',
-      barValue: reducedActive || 0,
-      legendValue: formatAmount(reducedActive ?? 0),
-    },
-    {
-      label: 'Low',
-      barValue: lowActive || 0,
-      legendValue: formatAmount(lowActive ?? 0),
-    },
-  ];
+const MockMapComponent: React.FC = (props) => {
+  const content = 'Test Map';
+  return <div data-testid="mocked-map">{content}</div>;
 };
 
-export const floodColumnAccordionData = [
-  { key: 'floodHazard', header: 'Flood Hazard' },
-  { key: 'locationCount', header: 'Location Count' },
-  { key: 'tiv', header: 'TIV' },
-  { key: 'tivPercentage', header: 'TIV %' },
-  { key: 'hundredYearLoss', header: 'Total 100 Yr LE' },
-  { key: 'fiveHundredYearLoss', header: 'Total 500yr LE' },
-];
+jest.mock('@fmglobal/dce-esri-components', () => ({
+    __esModule: true,
+    BTPPrescreeningMap: jest.fn(() => <MockMapComponent />),
+    MapLayer: {},
+    MapLayerType: {},
+    Basemaps: { STREETS_VECTOR: 'streets vector' },
+  }));
 
-export const createTableDataForAccordion = (
-  tivData: FloodBarChartDTO,
-  includeProspect: boolean,
-) => {
-  const { floodTivData, totalTIV, totalActiveTIV } = tivData;
-  const total = (includeProspect ? totalTIV : totalActiveTIV) ?? 0;
-  const floodTableData: {
-    floodHazard: string;
-    locationCount: number;
-    tiv: string;
-    tivPercentage: string;
-    hundredYearLoss: string;
-    fiveHundredYearLoss: string;
-  }[] = [];
+jest.mock('src/common/contexts/AccountContext');
+jest.mock('src/common/contexts/HeaderContext');
 
-  floodTivData?.forEach((dataObj: FloodLocChartAgg) => {
-    const floodHazard = dataObj.flood_hazard_frequency;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { active_location_aggregates } = dataObj;
-    let locationCount = active_location_aggregates?.location_count ?? 0;
-    let tiv = dataObj?.active_location_aggregates?.total_insured_value ?? 0;
-    let tivPercentage = convertToPercent(tiv, total);
-    let hundredYearLoss =
-      dataObj?.active_location_aggregates?.hundred_year_loss_expectancy ?? 0;
-    let fiveHundredYearLoss =
-      dataObj?.active_location_aggregates?.five_hundred_year_loss_expectancy ??
-      0;
-    if (includeProspect) {
-      locationCount +=
-        dataObj?.prospect_location_aggregates?.location_count ?? 0;
-      tiv += dataObj?.prospect_location_aggregates?.total_insured_value ?? 0;
-      tivPercentage = convertToPercent(tiv, total);
-      hundredYearLoss +=
-        dataObj?.prospect_location_aggregates?.hundred_year_loss_expectancy ??
-        0;
-      fiveHundredYearLoss +=
-        dataObj?.prospect_location_aggregates
-          ?.five_hundred_year_loss_expectancy ?? 0;
-    }
-    if (locationCount) {
-      floodTableData.push({
-        floodHazard,
-        locationCount,
-        tiv: formatAmount(tiv),
-        tivPercentage,
-        hundredYearLoss: formatAmount(hundredYearLoss),
-        fiveHundredYearLoss: formatAmount(fiveHundredYearLoss),
+const mockNavigateToBoB = jest.fn();
+jest.mock('@btp/shared-ui', () => ({
+  ...jest.requireActual('@btp/shared-ui'),
+  useShellNavigation: jest.fn(() => ({
+    navigateToBoB: mockNavigateToBoB,
+  })),
+}));
+
+jest.mock('@apollo/client', () => ({
+  ...jest.requireActual('@apollo/client'),
+  useQuery: jest.fn(),
+}));
+
+const mockUseAuthorizationContext = jest.fn();
+jest.mock('cas-react', () => ({
+  useAuthorizationContext: () => mockUseAuthorizationContext(),
+}));
+
+describe('PrescreeningMap Component', () => {
+
+  it('should render PrescreeningMap without any errors', () => {
+    const PrescreeningMapProps = {
+      locationPinsData: [
+        {
+          id: '1ASDASDAAASASASKJHAVBYIOKJ798KKAJGHKJH79965KLADAJGHIUHJN7896778',
+          longitude: -96.8035600038,
+          latitude: 32.8121000028,
+          name: 'Tire Company Inc',
+          occupancyName: 'Plastic and Rubber Products',
+          indexRecNumber: 'IR200.08.-153',
+          address: '2905 Stonebridge Court, Norman OK 73071',
+          address_line_1: '2905 Stonebridge Court',
+          address_line_2: '',
+          city_name: 'Norman',
+          state_province_code: 'OK',
+          postal_code: '73071',
+          country_name: 'United States',
+          tivValue: 8.8,
+          tiv: '$8.2M',
+          floodZone: 'Low',
+          windZone: '90MPH',
+          earthquakeZone: '>500',
+        },
+      ],
+      zoomLevel: 2,
+    };
+    render(<PrescreeningMap {...PrescreeningMapProps} />);
+  });
+});
+
+describe('NatHazMap Component', () => {
+  const mockUseHeader = useHeader as jest.Mock;
+  const mockUseAccount = useAccount as jest.Mock;
+  const useQueryMock = useQuery as jest.Mock;
+  mockUseAuthorizationContext.mockReturnValue({
+    usersRoles: ['role1'],
+  });
+  beforeEach(() => {
+    mockUseHeader.mockReturnValue({
+      asofDate: new Date(),
+    });
+    mockUseAccount.mockReturnValue({
+      accountDetails: {
+        orgid: '123',
+      },
+    });
+    
+    useQueryMock.mockReturnValue({
+      data: {
+        latest_prospect_clients: [
+          {
+            as_of_business_interest_details: [
+              {
+                business_interest_geofacts: [
+                  {
+                    longitude_measure: -96.8035600038,
+                    latitude_measure: 32.8121000028,
+                    flood_exposure_description: 'Low',
+                    wind_speed_miles_per_hour_description: '90MPH',
+                    earthquake_frequency_zone_description: '>500',
+                  },
+                ],
+                cbi_id:
+                  '1ASDASDAAASASASKJHAVBYIOKJ798KKAJGHKJH79965KLADAJGHIUHJN7896778',
+                name: 'Tire Company Inc',
+                occupancy: { description: 'Plastic and Rubber Products' },
+                index_record_number: 'IR200.08.-153',
+                street: '2905 Stonebridge Court',
+                city_name: 'Norman',
+                state_province_code: 'OK',
+                postal_code: '73071',
+                country_name: 'United States',
+                reported_currency_total_amount: 8.8,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it('should return MapDetails success response and should render NatHazMap without any errors', () => {
+    render(<NatHazMap />);
+    expect(screen.getByText('Test Map')).toBeInTheDocument();
+  });
+  it('should render NatHazMap with redirect notice', () => {
+    mockUseAuthorizationContext.mockReturnValue({
+        usersRoles: [],
       });
-    }
+    render(<NatHazMap />);
+    expect(screen.getByText('Redirect notice')).toBeInTheDocument();
   });
-  return floodTableData;
-};
-
-export const CreateFloodBarChart = (
-  param: FloodBarChartDTO,
-  includeProspect: boolean,
-) => {
-  const { totalTIV, totalActiveTIV } = param;
-  const data = createActiveChartData(param, includeProspect);
-
-  const total = (includeProspect ? totalTIV : totalActiveTIV) ?? 0;
-  const floodChart = React.createElement(BarChart, {
-    barData: data,
-    total,
-    rightContent: [
-      {
-        value: formatAmount(total) ?? 0,
-        label: 'Total TIV',
-      },
-    ],
-    theme: includeProspect ? ColorThemes.Prospect : ColorThemes.Active,
-  });
-  const floodTableData = createTableDataForAccordion(param, includeProspect);
-
-  const floodTableList = React.createElement(TableList, {
-    tableTitle: 'Flood',
-    tableData: floodTableData,
-    columnData: floodColumnAccordionData,
-    actions: actionsMock,
-  });
-  return {
-    accTitle: 'Flood',
-    status: RiskStatus?.VERY_SEVERE,
-    accComp: floodChart,
-    accItemComp: floodTableList,
-  };
-};
-
-export default CreateFloodBarChart;
+});
