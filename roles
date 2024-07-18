@@ -1,0 +1,32 @@
+import { Route, Routes } from 'react-router-dom';
+import NatHazContainer from 'src/NatHazContainer/NatHazContainer';
+import { NatHazMap } from 'src/NatHazMap/NatHazMap';
+import NotFoundPage from 'src/common/pages/NotFoundPage';
+import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
+
+export function MainRoutes() {
+  return (
+    <Routes>
+      <Route path=":orgid">
+        <Route path="map" element={<NatHazMap />} />
+        <Route index element={<NatHazContainer />} />
+        <Route path="*" element={<NotFoundPage />} />
+        <Route
+          path={NatHazModuleUrlRouteEnum.FLOODURL}
+          element={<NatHazContainer />}
+        />
+        <Route
+          path={NatHazModuleUrlRouteEnum.WINDURL}
+          element={<NatHazContainer />}
+        />
+        <Route
+          path={NatHazModuleUrlRouteEnum.EARTHURL}
+          element={<NatHazContainer />}
+        />
+      </Route>
+      <Route path="/" element={<NatHazContainer />} />
+    </Routes>
+  );
+}
+
+export default MainRoutes;
