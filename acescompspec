@@ -1,0 +1,136 @@
+import {
+  getWindAggregations,
+  getWindAccumulations,
+  onWindHistorySelection,
+  onWindTryAgainClick,
+  getwindAreasOfCommonExposureData,
+  windAccumulationColumnDefs,
+  windAggregationsColumnDefs,
+} from './path/to/your/functions/file';
+import { WindAggregation, WindAccumulation, WindAreasOfCommonExposureDTO } from '@btp/shared-ui';
+
+describe('windAccumulationColumnDefs', () => {
+  it('should define columns correctly', () => {
+    expect(windAccumulationColumnDefs).toEqual([
+      { headerName: 'Identifier', field: 'identifier' },
+      { headerName: 'Locations', field: 'locations' },
+      { headerName: 'TIV', field: 'tiv', sort: 'desc' },
+      { headerName: 'Largest TIV', field: 'largestTIV', sort: 'desc' },
+      { headerName: 'Wind Severity', field: 'WindSeverity' },
+    ]);
+  });
+});
+
+describe('windAggregationsColumnDefs', () => {
+  it('should define columns correctly', () => {
+    expect(windAggregationsColumnDefs).toEqual([
+      { headerName: 'Identifier', field: 'identifier' },
+      { headerName: 'Locations', field: 'locations' },
+      { headerName: 'Wind LE', field: 'LE', sort: 'desc' },
+      { headerName: 'Largest Wind LE', field: 'largestLE', sort: 'desc' },
+      { headerName: 'Wind Severity', field: 'WindSeverity' },
+    ]);
+  });
+});
+
+describe('getWindAggregations', () => {
+  it('should return formatted data correctly', () => {
+    const data: WindAggregation[] = [
+      { identifier: 'ID1', locations: 'Loc1', LE: 1000, largestLE: 5000, WindSeverity: 'Severe' },
+    ];
+    expect(getWindAggregations(data)).toEqual([
+      { identifier: 'ID1', locations: 'Loc1', LE: '1,000', largestLE: '5,000', WindSeverity: 'Severe' },
+    ]);
+  });
+
+  it('should return an empty array if data is null', () => {
+    expect(getWindAggregations(null)).toEqual([]);
+  });
+});
+
+describe('getWindAccumulations', () => {
+  it('should return formatted data correctly', () => {
+    const data: WindAccumulation[] = [
+      { identifier: 'ID1', locations: 'Loc1', tiv: 2000, largestTIV: 6000, WindSeverity: 'Severe' },
+    ];
+    expect(getWindAccumulations(data)).toEqual([
+      { identifier: 'ID1', locations: 'Loc1', tiv: '2,000', largestTIV: '6,000', WindSeverity: 'Severe' },
+    ]);
+  });
+
+  it('should return an empty array if data is null', () => {
+    expect(getWindAccumulations(null)).toEqual([]);
+  });
+});
+
+describe('onWindHistorySelection', () => {
+  it('should log the history selection value', () => {
+    console.log = jest.fn();
+    onWindHistorySelection('history_value');
+    expect(console.log).toHaveBeenCalledWith('ACES History Selection:', 'history_value');
+  });
+});
+
+describe('onWindTryAgainClick', () => {
+  it('should log the try again click value', () => {
+    console.log = jest.fn();
+    onWindTryAgainClick('try_again_value');
+    expect(console.log).toHaveBeenCalledWith('Try Again Click:', 'try_again_value');
+  });
+});
+
+describe('getwindAreasOfCommonExposureData', () => {
+  it('should return correct ACES data when data is provided', () => {
+    const data: WindAreasOfCommonExposureDTO = {
+      wind_aggregations: [
+        { identifier: 'ID1', locations: 'Loc1', LE: 1000, largestLE: 5000, WindSeverity: 'Severe' },
+      ],
+      wind_accumulations: [
+        { identifier: 'ID2', locations: 'Loc2', tiv: 2000, largestTIV: 6000, WindSeverity: 'Moderate' },
+      ],
+    };
+
+    const expectedOutput = {
+      acesPeril: 'Wind',
+      acesComp: expect.anything(), // Placeholder for the React component
+    };
+
+    expect(getwindAreasOfCommonExposureData(data, null, false)).toEqual(expectedOutput);
+  });
+
+  it('should return loading data when loading status is true', () => {
+    const expectedOutput = {
+      acesPeril: 'Wind',
+      acesComp: expect.anything(), // Placeholder for the React component
+    };
+
+    expect(getwindAreasOfCommonExposureData(null, null, true)).toEqual(expectedOutput);
+  });
+
+  it('should return error data when errorCode is provided', () => {
+    const data: WindAreasOfCommonExposureDTO = {
+      wind_aggregations: [
+        { identifier: 'ID1', locations: 'Loc1', LE: 1000, largestLE: 5000, WindSeverity: 'Severe' },
+      ],
+      wind_accumulations: [
+        { identifier: 'ID2', locations: 'Loc2', tiv: 2000, largestTIV: 6000, WindSeverity: 'Moderate' },
+      ],
+    };
+
+    const expectedOutput = {
+      acesPeril: 'Wind',
+      acesComp: expect.anything(), // Placeholder for the React component
+    };
+
+    expect(getwindAreasOfCommonExposureData(data, 'ERROR_CODE', false)).toEqual(expectedOutput);
+  });
+
+  it('should return no data when no data and no error code and not loading', () => {
+    const expectedOutput = {
+      acesPeril: 'Wind',
+      acesComp: expect.anything(), // Placeholder for the React component
+    };
+
+    expect(getwindAreasOfCommonExposureData(null, null, false)).toEqual(expectedOutput);
+  });
+});
