@@ -1,0 +1,331 @@
+import {
+  NATURAL_HAZARDS_EARTHQUAKE_ENABLED,
+  NATURAL_HAZARDS_FLOOD_ENABLED,
+  NATURAL_HAZARDS_WIND_ENABLED,
+  AccType,
+  CreateEarthMovementBarChart,
+  CreateFloodBarChart,
+  CreateWindBarChart,
+  TableRowType,
+  ACESType,
+  getwindAreasOfCommonExposureData,
+} from '@btp/shared-ui';
+import { useFlags } from 'launchdarkly-react-client-sdk';
+import { RdsBox } from 'rds-components-react';
+import React, { ReactElement, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import NatHazFilters from 'src/NatHazDetails/NatHazFilters/NatHazFilters';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { NatHazModuleUrlRouteEnum } from 'src/common/utils/constants/nathaz.enum';
+import { getNavigationUrl } from 'src/common/utils/navigationHelper';
+import useFetchWindBarAndAccordionData from 'src/hooks/useFetchWindBarChartData';
+import useFetchEarthMovementBarAndAccordionData from 'src/hooks/useFetchEarthMovementBarData';
+import { RightUtilityBar } from 'src/common/components/RightUtilityBar';
+import { useFetchFloodBarAndAccordionData } from 'src/hooks/useFetchFloodBarData';
+import useCreateWindAreasOfCommonExposures from 'src/hooks/useFetchWindAreasOfCommonExposure';
+import { NatHazPerilAccordion } from './NatHazPerilAccordion/NatHazPerilAccordion';
+
+export type PerilError = {
+  peril: NatHazModuleUrlRouteEnum;
+  errorState: boolean;
+  traceId: string | null | undefined;
+  onTryAgainAction: () => void;
+};
+
+export const handleTitleClick = (
+  title: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  flagProps: any,
+  condition?: TableRowType,
+  handleCondition?: (cond: TableRowType) => void,
+) => {
+  let pageUrl: string = '';
+  if (condition && handleCondition) {
+    handleCondition(condition);
+  }
+  switch (title) {
+    case 'Flood':
+      pageUrl = flagProps.floodEnabled ? NatHazModuleUrlRouteEnum.FLOODURL : '';
+      break;
+    case 'Wind':
+      pageUrl = flagProps.windEnabled ? NatHazModuleUrlRouteEnum.WINDURL : '';
+      break;
+    case 'Earth Movement':
+      pageUrl = flagProps.earthquakeEnabled
+        ? NatHazModuleUrlRouteEnum.EARTHURL
+        : '';
+      break;
+    default:
+      break;
+  }
+  if (pageUrl) {
+    flagProps.navigateTo(pageUrl);
+  }
+};
+
+export function NatHazOverview() {
+  const { accountDetails } = useAccount();
+  const [numPerilLoading, setNumPerilLoading] = useState(0);
+  const [perilErrors, setPerilErrors] = useState<PerilError[]>([]);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const {
+    FloodAttributes,
+    loading: FloodAttributesLoading,
+    errorCode: FloodAttributesError,
+    refetch: floodRefetch,
+  } = useFetchFloodBarAndAccordionData();
+  const {
+    EarthMovementAttributes,
+    loading: EarthMovementAttributesLoading,
+    errorCode: EarthMovementAttributesError,
+    refetch: earthMovementRefetch,
+  } = useFetchEarthMovementBarAndAccordionData();
+  const {
+    WindAttributes,
+    loading: WindAttributesLoading,
+    errorCode: WindAttributesError,
+    refetch: windRefetch,
+  } = useFetchWindBarAndAccordionData();
+  const {
+    activeTab,
+    setActiveTab,
+    includeProspect,
+    setIncludeProspect,
+    asofDate,
+    setFilterCondition,
+    acesExpandedPerils,
+  } = useHeader();
+  const flags = useFlags();
+
+  const floodEnabled = flags[NATURAL_HAZARDS_FLOOD_ENABLED];
+  const windEnabled = flags[NATURAL_HAZARDS_WIND_ENABLED];
+  const earthquakeEnabled = flags[NATURAL_HAZARDS_EARTHQUAKE_ENABLED];
+  const [perilData, setPerilData] = useState<AccType[]>([]);
+  const [acesData, setAcesData] = useState<ACESType[]>([]);
+  const [windAcesData, setWindAcesData] = useState<ACESType | null>(null);
+  const [windAcesDataLoading, setWindAcesDataLoading] = useState(false);
+
+  const CreateWindAreasOfCommonExposures =
+    useCreateWindAreasOfCommonExposures();
+  const navigateTo = (pageUrl: string) => {
+    navigate(
+      getNavigationUrl({
+        locationPath: pathname,
+        orgId: accountDetails.orgid,
+        pageUrl,
+      }),
+    );
+  };
+
+  const flagProps = {
+    floodEnabled,
+    windEnabled,
+    earthquakeEnabled,
+    navigateTo: (pageUrl: string) => navigateTo(pageUrl),
+  };
+
+  const updatedPerilData: AccType[] = perilData
+    ?.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const element = item.accItemComp as ReactElement<any>;
+      if (
+        (item.accTitle === 'Flood' && floodEnabled) ||
+        (item.accTitle === 'Wind' && windEnabled) ||
+        (item.accTitle === 'Earth Movement' && earthquakeEnabled)
+      ) {
+        return {
+          ...item,
+          accItemComp: React.cloneElement(element, {
+            actions: {
+              gridAction: {
+                onClick: (peril: string, condition: TableRowType) =>
+                  handleTitleClick(
+                    peril,
+                    flagProps,
+                    condition,
+                    setFilterCondition,
+                  ),
+              },
+            },
+          }),
+          onTitleClick: (title: string) => handleTitleClick(title, flagProps),
+        };
+      }
+      return {
+        accTitle: '',
+      };
+    })
+    .filter((item) => item.accTitle !== '');
+
+  useEffect(() => {
+    if (
+      (pathname.endsWith(`${accountDetails.orgid}`) ||
+        pathname.endsWith(`${accountDetails.orgid}/`)) &&
+      activeTab !== 0
+    ) {
+      setActiveTab(0);
+    }
+  }, [accountDetails.orgid, activeTab, pathname, setActiveTab]);
+
+  useEffect(() => {
+    const loadingStates = [
+      FloodAttributesLoading && floodEnabled,
+      WindAttributesLoading && windEnabled,
+      EarthMovementAttributesLoading && earthquakeEnabled,
+    ];
+
+    setNumPerilLoading(
+      loadingStates.reduce(
+        (count, isLoading) => count + (isLoading ? 1 : 0),
+        0,
+      ),
+    );
+
+    const chartArr: AccType[] = [];
+    if (floodEnabled && FloodAttributes !== null && !FloodAttributesLoading) {
+      const floodChart = CreateFloodBarChart(FloodAttributes, includeProspect);
+      chartArr.push(floodChart);
+    }
+    if (
+      earthquakeEnabled &&
+      EarthMovementAttributes !== null &&
+      !EarthMovementAttributesLoading
+    ) {
+      const earthMovementChart = CreateEarthMovementBarChart(
+        EarthMovementAttributes,
+        includeProspect,
+      );
+      chartArr.push(earthMovementChart);
+    }
+
+    if (windEnabled && WindAttributes !== null && !WindAttributesLoading) {
+      const windBarChart = CreateWindBarChart(WindAttributes, includeProspect);
+      chartArr.push(windBarChart);
+    }
+
+    const errorStates = [
+      {
+        peril: NatHazModuleUrlRouteEnum.FLOODURL,
+        errorState:
+          floodEnabled && !FloodAttributesLoading && FloodAttributes == null,
+        traceId: FloodAttributesError,
+        onTryAgainAction: floodRefetch,
+      },
+      {
+        peril: NatHazModuleUrlRouteEnum.EARTHURL,
+        errorState:
+          earthquakeEnabled &&
+          !EarthMovementAttributesLoading &&
+          EarthMovementAttributes == null,
+        traceId: EarthMovementAttributesError,
+        onTryAgainAction: earthMovementRefetch,
+      },
+      {
+        peril: NatHazModuleUrlRouteEnum.WINDURL,
+        errorState:
+          windEnabled && !WindAttributesLoading && WindAttributes == null,
+        traceId: WindAttributesError,
+        onTryAgainAction: windRefetch,
+      },
+    ];
+
+    setPerilErrors(errorStates);
+    setPerilData(chartArr);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    floodEnabled,
+    earthquakeEnabled,
+    windEnabled,
+    FloodAttributesLoading,
+    EarthMovementAttributesLoading,
+    WindAttributesLoading,
+    includeProspect,
+    FloodAttributes,
+    WindAttributes,
+    EarthMovementAttributes,
+    FloodAttributesError,
+    EarthMovementAttributesError,
+    WindAttributesError,
+  ]);
+
+  useEffect(() => {
+    // Flood ACES enabled
+
+    // Earth Movement ACES enabled
+
+    // Wind ACES enabled
+    if (acesExpandedPerils.includes('Wind')) {
+      const windACESLoading = getwindAreasOfCommonExposureData(
+        null,
+        null,
+        true,
+      );
+      setWindAcesData(windACESLoading);
+      setWindAcesDataLoading(true);
+      CreateWindAreasOfCommonExposures(includeProspect)
+        .then(({ windAreasOfCommonExposureData, errorCode }) => {
+          setWindAcesData(null);
+          const windACES = getwindAreasOfCommonExposureData(
+            windAreasOfCommonExposureData,
+            errorCode,
+            false,
+          );
+          setWindAcesData(windACES);
+          setWindAcesDataLoading(false);
+        })
+        .catch(() => {
+          // handle error
+          setWindAcesDataLoading(false);
+        });
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acesExpandedPerils, includeProspect]);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const AcesArray: any = [];
+    if (windAcesData) {
+      AcesArray.push(windAcesData);
+    }
+    setAcesData(AcesArray);
+  }, [windAcesData, windAcesDataLoading]);
+
+  return (
+    <RdsBox
+      className="w-full h-full overflow-auto"
+      data-testid="overview"
+      height="calc(100vh - 4rem)"
+    >
+      <div className="flex flex-row">
+        <div className="flex flex-row flex-grow">
+          <div className="flex-grow pb-4">
+            <NatHazFilters
+              includeProspect={includeProspect}
+              setIncludeProspect={setIncludeProspect}
+              asofDate={asofDate}
+              isOverview
+            />
+            <NatHazPerilAccordion
+              perilData={updatedPerilData}
+              loadingCount={numPerilLoading}
+              errorStates={perilErrors}
+              acesData={acesData}
+            />
+          </div>
+        </div>
+        <RdsBox
+          className="flex-shrink-0 h-full overflow-auto"
+          height="calc(100vh - 4rem)"
+        >
+          <RightUtilityBar />
+        </RdsBox>
+      </div>
+    </RdsBox>
+  );
+}
+
+export default NatHazOverview;
