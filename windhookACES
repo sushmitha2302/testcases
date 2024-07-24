@@ -1,0 +1,108 @@
+
+import { useMutation } from '@apollo/client';
+import {
+  BtpNaturalHazards_CreateWindExposure_V01Document,
+  BtpNaturalHazards_CreateWindExposure_V01Mutation,
+} from 'src/models';
+import { useAccount } from 'src/common/contexts/AccountContext';
+import { useCallback } from 'react';
+import {
+  convertDateToJson,
+  WindAreasOfCommonExposureDTO,
+} from '@btp/shared-ui';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { projectErrorCode } from 'src/common/utils/projectErrorCode';
+
+export const CreateWindAreasOfCommonExposures = () => {
+  const [mutation] =
+    useMutation<BtpNaturalHazards_CreateWindExposure_V01Mutation>(
+      BtpNaturalHazards_CreateWindExposure_V01Document,
+    );
+  return mutation;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getWindAccumulations = (windAccumulations: any) => {
+  if (windAccumulations == null) {
+    return [];
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return windAccumulations.map((windAccumulation: any) => {
+    const res = {
+      identifier: windAccumulation.identifier,
+      locations: windAccumulation.locations.length,
+      WindSeverity: windAccumulation.severity,
+      tiv: windAccumulation.total_insured_value,
+      largestTIV: windAccumulation.largest_total_insured_value,
+    };
+    return res;
+  });
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getWindAggregations = (windAggregations: any) => {
+  if (windAggregations == null) {
+    return [];
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return windAggregations.map((windAggregation: any) => {
+    const res = {
+      identifier: windAggregation.identifier,
+      locations: windAggregation.locations.length,
+      WindSeverity: windAggregation.severity,
+      LE: windAggregation.loss_expectancy,
+      largestLE: windAggregation.largest_loss_expectancy,
+    };
+    return res;
+  });
+};
+
+export const useCreateWindAreasOfCommonExposures = () => {
+  const { accountDetails } = useAccount();
+  const { orgid } = accountDetails;
+  const { selectedCurrency, asofDate } = useHeader();
+  const mutation = CreateWindAreasOfCommonExposures();
+
+  return useCallback(
+    async (prospect: boolean) => {
+      const { data, errors } = await mutation({
+        variables: {
+          org_prospect_client_id: orgid,
+          as_of_date: convertDateToJson(asofDate),
+          context_currency_type_id: selectedCurrency,
+          include_prospects: prospect,
+        },
+        errorPolicy: 'all',
+      });
+
+      const windAreasofCommonExposure =
+        data?.btp_natural_hazards?.create_wind_exposure;
+
+      const windAreasOfCommonExposureData: WindAreasOfCommonExposureDTO | null =
+        windAreasofCommonExposure == null
+          ? null
+          : {
+              org_prospect_client_id:
+                windAreasofCommonExposure.org_prospect_client_id,
+              as_of_date: windAreasofCommonExposure.as_of_date,
+              currency_type_id: windAreasofCommonExposure.currency_type_id,
+              create_date: windAreasofCommonExposure.create_date,
+              wind_accumulations: getWindAccumulations(
+                windAreasofCommonExposure.wind_accumulations,
+              ),
+              wind_aggregations: getWindAggregations(
+                windAreasofCommonExposure.wind_aggregations,
+              ),
+            };
+
+      return {
+        windAreasOfCommonExposureData,
+        errorCode: projectErrorCode(errors),
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orgid, mutation, asofDate, selectedCurrency],
+  );
+};
+
+export default useCreateWindAreasOfCommonExposures;
