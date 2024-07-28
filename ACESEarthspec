@@ -1,0 +1,115 @@
+import { renderHook } from '@testing-library/react';
+import { useMutation } from '@apollo/client';
+import { useCreateEarthMovementAreasOfCommonExposures } from './useCreateEarthMovementAreasOfCommonExposures';
+
+const mockMutation: jest.Mock = jest.fn();
+jest.mock('@apollo/client', () => ({
+  ...jest.requireActual('@apollo/client'),
+  useMutation: jest.fn(),
+}));
+
+jest.mock('src/common/contexts/AccountContext', () => ({
+  useAccount: jest.fn(() => ({ accountDetails: { orgid: 1234 } })),
+}));
+
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  useHeader: jest.fn(() => ({
+    selectedCurrency: 789,
+    asofDate: '2023-01-01',
+  })),
+}));
+
+jest.mock('src/models', () => ({
+  BtpNaturalHazards_CreateEarthMovementExposure_V01Document: 'mock-document',
+}));
+
+describe('useCreateEarthMovementAreasOfCommonExposures', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(useCreateEarthMovementAreasOfCommonExposures).toBeDefined();
+  });
+
+  it('should call mutation with correct variables and return data successfully', async () => {
+    const useMutationMock = useMutation as jest.Mock;
+    useMutationMock.mockReturnValue([
+      mockMutation,
+      {
+        data: {
+          btp_natural_hazards: {
+            create_earth_movement_exposure: {
+              earth_movement_exposure_id: 'exposure-id',
+              org_prospect_client_id: 1234,
+              as_of_date: '2023-01-01',
+              currency_type_id: 789,
+              create_time: '2023-01-01T00:00:00Z',
+              prospects_included: true,
+              earth_movement_accumulations: [
+                {
+                  identifier: 'accum-id',
+                  locations: [{}, {}, {}], // Example locations
+                  severity: 'High',
+                  total_insured_value: 1000000,
+                  largest_total_insured_value: 500000,
+                },
+              ],
+            },
+          },
+        },
+        errors: null,
+      },
+    ]);
+
+    const { result } = renderHook(() => useCreateEarthMovementAreasOfCommonExposures());
+
+    const data = await result.current(true);
+
+    expect(useMutation).toHaveBeenCalled();
+    expect(data.EarthMovementAreasOfCommonExposureData).toBeDefined();
+    expect(data.EarthMovementAreasOfCommonExposureData?.earth_movement_exposure_id).toBe('exposure-id');
+    expect(data.errorCode).toBe(null);
+  });
+
+  it('should handle mutation errors', async () => {
+    const useMutationMock = useMutation as jest.Mock;
+    useMutationMock.mockReturnValue([
+      mockMutation,
+      {
+        data: null,
+        errors: [{ message: 'Mutation error' }],
+      },
+    ]);
+
+    const { result } = renderHook(() => useCreateEarthMovementAreasOfCommonExposures());
+
+    const data = await result.current(true);
+
+    expect(useMutation).toHaveBeenCalled();
+    expect(data.EarthMovementAreasOfCommonExposureData).toBeNull();
+    expect(data.errorCode).toBe('Mutation error');
+  });
+
+  it('should handle null data from mutation', async () => {
+    const useMutationMock = useMutation as jest.Mock;
+    useMutationMock.mockReturnValue([
+      mockMutation,
+      {
+        data: {
+          btp_natural_hazards: {
+            create_earth_movement_exposure: null,
+          },
+        },
+        errors: null,
+      },
+    ]);
+
+    const { result } = renderHook(() => useCreateEarthMovementAreasOfCommonExposures());
+
+    const data = await result.current(true);
+
+    expect(useMutation).toHaveBeenCalled();
+    expect(data.EarthMovementAreasOfCommonExposureData).toBeNull();
+  });
+});
