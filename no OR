@@ -10,7 +10,54 @@ import {
   EarthMovementAreasOfCommonExposureDTO,
 } from '@btp/shared-ui';
 import { useHeader } from 'src/common/contexts/HeaderContext';
-import { projectErrorCode } from 'src/common/utils/projectErrorCode';
+import { projectErrorCode } from 'src/common/utils/projectErrorCode'useEffect(() => {
+  const fetchAcesLocations = async () => {
+    try {
+      // Fetch locations from ACES
+      const acesLocations = await getAcesLocations();
+      const acesCbiIds = acesLocations.map(location => location.cbiId);
+
+      handleSelectionChange([]);
+      
+      const { activeDataList } = getDataList(windDetails);
+      const updatedData = includeProspect
+        ? (windDetails as WindDataType[])
+        : (activeDataList as WindDataType[]);
+
+      if (activeModule === NatHazModuleEnum.WIND && filterCondition) {
+        if (filterCondition.windRegion && filterCondition.uwWindTierCodeDescription) {
+          setFilteredList(
+            updatedData.filter(
+              (item) =>
+                item.windRegion === filterCondition.windRegion &&
+                item.uwWindTierCodeDescription === filterCondition.uwWindTierCodeDescription &&
+                acesCbiIds.includes(item.cbiId),
+            ),
+          );
+        } else {
+          setFilteredList(
+            updatedData.filter(
+              (item) => acesCbiIds.includes(item.cbiId),
+            ),
+          );
+        }
+      } else {
+        setFilteredList(updatedData);
+      }
+    } catch (error) {
+      console.error("Failed to fetch ACES locations:", error);
+      setFilteredList([]);
+    }
+  };
+
+  fetchAcesLocations();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [includeProspect, asofDate, filterCondition]);
+
+return (
+  // ... your return JSX here
+);
+
 
 export const CreateEarthMovementAreasOfCommonExposures = () => {
   const [mutation] =
