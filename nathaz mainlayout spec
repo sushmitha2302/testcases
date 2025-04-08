@@ -1,0 +1,194 @@
+import MainLayout from './MainLayout';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { RdsMenu } from 'rds-components-react';
+import { Spas } from '../utils/constants/constants';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { mockFlags } from 'jest-launchdarkly-mock';
+import { SHARED_SHOW_USER_MENU_ON_ALL_APPS } from '@btp/shared-ui';
+
+const mockUseNavigate = jest.fn();
+const mockUseLocation = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockUseNavigate,
+  useLocation: () => mockUseLocation(),
+}));
+
+const mockNavigateToBoB = jest.fn();
+const mockNavigateToAccountOverview = jest.fn();
+const mockNavigateToSituationalAnalysis = jest.fn();
+const mockNavigateToValues = jest.fn();
+const mockNavigateToNaturalHazards = jest.fn();
+const mockNavigateToPrescreening = jest.fn();
+const mockSetActivemodule = jest.fn();
+jest.mock('@btp/shared-ui', () => ({
+  ...jest.requireActual('@btp/shared-ui'),
+  useShellNavigation: jest.fn(() => ({
+    navigateToBoB: mockNavigateToBoB,
+    navigateToAccountOverview: mockNavigateToAccountOverview,
+    navigateToSituationalAnalysis: mockNavigateToSituationalAnalysis,
+    navigateToValues: mockNavigateToValues,
+    navigateToNaturalHazards: mockNavigateToNaturalHazards,
+    navigateToProspectScreeningOverview: mockNavigateToPrescreening,
+    setActiveModule: mockSetActivemodule,
+  })),
+}));
+
+(useHeader as jest.Mock).mockReturnValue({
+  currencyList: [
+    {
+      code: 'USD',
+      description: 'U.S Dollar',
+      id: 47,
+    },
+  ],
+
+  setCurrencyList: jest.fn(),
+  setSelectedCurrency: jest.fn(),
+  setIsSidebarDisplayed: jest.fn(),
+  isSidebarDisplayed: true,
+});
+
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  __esModule: true,
+  useHeader: jest.fn(() => ({
+    selectedCurrency: 456,
+    asofDate: '2022-01-01',
+    includeProspect: false,
+    currencyList: { code: 'USD', description: 'Dollars', id: 47 },
+    activeModule: 'dfd',
+    setActiveModule: jest.fn(),
+    setIsSidebarDisplayed: jest.fn(),
+    isSidebarDisplayed: true,
+    setSelectedCurrency: jest.fn(),
+  })),
+}));
+
+jest.mock('src/common/contexts/AccountContext', () => ({
+  __esModule: true,
+  navigateToSPA: jest.fn(() => ({
+    navigateToAccountOverview: jest.fn(),
+  })),
+  useAccount: jest.fn(() => ({
+    accountDetails: {
+      orgId: '00396',
+      accountName: 'Account Name',
+      accountNumber: 'text#account',
+    },
+  })),
+}));
+
+describe('Main Layout', () => {
+  it('render the mainLayout', () => {
+    const children_render = () => {
+      return <h1>This is child Element</h1>;
+    };
+    const { baseElement } = render(
+      <MainLayout>{children_render()}</MainLayout>,
+    );
+    expect(baseElement).toBeTruthy();
+  });
+});
+
+describe('Main layout btp header', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('SHOULD change the currency and close the sidebar', async () => {
+    const setIsSidebarDisplayed = jest.fn();
+    (useHeader as jest.Mock).mockReturnValue({
+      selectedCurrency: 456,
+      currencyList: [{ code: 'USD', description: 'Dollars', id: 47 }],
+      setActiveModule: jest.fn(),
+      setIsSidebarDisplayed,
+      isSidebarDisplayed: true,
+      setSelectedCurrency: jest.fn(),
+    });
+
+    render(
+      <MainLayout>
+        <h1>test child element</h1>
+      </MainLayout>,
+    );
+    expect(screen.getByTestId('currency-dropdown')).toBeDefined();
+    expect(RdsMenu).toBeDefined();
+
+    const currencyMenu = screen.getByTestId('currency-dropdown');
+    fireEvent.click(currencyMenu);
+
+    const currencyMenuItem = screen.getByText('USD');
+    fireEvent(
+      currencyMenuItem,
+      new CustomEvent('rdsMenuItemSelect', { bubbles: true }),
+    );
+
+    expect(currencyMenuItem).toBeDefined();
+    expect(setIsSidebarDisplayed).toHaveBeenCalled();
+  });
+
+  it('SHOULD render date picker ', async () => {
+    const setIsSidebarDisplayed = jest.fn();
+    const setAsofDate = jest.fn();
+
+    (useHeader as jest.Mock).mockReturnValue({
+      selectedCurrency: 456,
+      currencyList: [{ code: 'USD', description: 'Dollars', id: 47 }],
+      setActiveModule: jest.fn(),
+      setIsSidebarDisplayed,
+      isSidebarDisplayed: true,
+      setSelectedCurrency: jest.fn(),
+      setAsofDate,
+    });
+
+    const { container } = render(
+      <MainLayout>
+        <h1>test child element</h1>
+      </MainLayout>,
+    );
+
+    const datePicker = container.getElementsByTagName('rds-input-date-picker');
+    const datePickerInput = await screen.findByTestId<HTMLRdsDatePickerElement>(
+      'as-of-date-picker',
+    );
+    const datePickerButton =
+      await screen.findByTestId<HTMLRdsDatePickerElement>('as-of-date-picker');
+
+    expect(datePicker).toBeDefined();
+    expect(datePickerInput).toBeInTheDocument();
+
+    fireEvent(
+      datePickerInput,
+      new CustomEvent('rdsDatePickerChange', {
+        bubbles: true,
+        detail: { newDate: '01/01/2024' },
+      }),
+    );
+    expect(setIsSidebarDisplayed).toHaveBeenCalledWith(false);
+    expect(setAsofDate).toHaveBeenCalled();
+  });
+
+  it('should not display the user menu when flag is off', async () => {
+    mockFlags({
+      [SHARED_SHOW_USER_MENU_ON_ALL_APPS]: false,
+    });
+
+    render(
+      <MainLayout>
+        <h1>test child element</h1>
+      </MainLayout>,
+    );
+
+    expect(
+      screen.queryByTestId('btp-product-suite-shared-component-user-menu'),
+    ).not.toBeInTheDocument();
+  });
+
+  async function selectMenuItem(itemName: string) {
+    const menuItem = await screen.findByTestId<HTMLRdsMenuItemElement>(
+      itemName,
+    );
+    menuItem.click();
+    jest.advanceTimersByTime(1000);
+  }
+});
