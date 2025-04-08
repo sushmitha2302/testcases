@@ -1,0 +1,156 @@
+import MainLayout from './MainLayout';
+import { useHeader } from 'src/common/contexts/HeaderContext';
+import { RdsMenu, RdsButton, RdsMenuItem } from 'rds-components-react';
+import { Spas, SpaEnum } from '../utils/constants/constants';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { mockFlags } from 'jest-launchdarkly-mock';
+import { SHARED_SHOW_USER_MENU_ON_ALL_APPS, RISK_TRANSFER_NAVIGATION_ENABLED } from '@btp/shared-ui';
+import { convertDateToJson } from 'src/common/utils/helpers/helpers';
+
+// Mock dependencies
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => jest.fn(),
+  useLocation: () => jest.fn(),
+}));
+
+jest.mock('@btp/shared-ui', () => ({
+  ...jest.requireActual('@btp/shared-ui'),
+  useShellNavigation: jest.fn(() => ({
+    navigateToBoB: jest.fn(),
+    navigateToAccountOverview: jest.fn(),
+    navigateToSituationalAnalysis: jest.fn(),
+    navigateToValues: jest.fn(),
+    navigateToNaturalHazards: jest.fn(),
+    navigateToProspectScreeningOverview: jest.fn(),
+    setActiveModule: jest.fn(),
+  })),
+}));
+
+jest.mock('launchdarkly-react-client-sdk', () => ({
+  useFlags: jest.fn(),
+}));
+
+jest.mock('src/common/contexts/HeaderContext', () => ({
+  useHeader: jest.fn(),
+}));
+
+jest.mock('src/common/utils/helpers/helpers', () => ({
+  ...jest.requireActual('src/common/utils/helpers/helpers'),
+  convertDateToJson: jest.fn(),
+}));
+
+const mockUseHeader = useHeader as jest.MockedFunction<typeof useHeader>;
+
+describe('Main Layout', () => {
+  const defaultHeaderValues = {
+    selectedCurrency: 47,
+    setSelectedCurrency: jest.fn(),
+    asofDate: new Date('2022-01-01'),
+    setAsofDate: jest.fn(),
+    currencyList: [
+      { code: 'USD', description: 'U.S Dollar', id: 47 },
+      { code: 'EUR', description: 'Euro', id: 48 },
+    ],
+    setIsSidebarDisplayed: jest.fn(),
+    isSidebarDisplayed: false,
+    includeProspect: false,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseHeader.mockReturnValue(defaultHeaderValues);
+    jest.spyOn(require('launchdarkly-react-client-sdk'), 'useFlags').mockReturnValue({
+      [RISK_TRANSFER_NAVIGATION_ENABLED]: false,
+    });
+    (convertDateToJson as jest.Mock).mockImplementation((date) => date.toISOString());
+  });
+
+  it('should render the mainLayout with children', () => {
+    const { getByText } = render(
+      <MainLayout>
+        <h1>Test Child</h1>
+      </MainLayout>
+    );
+    expect(getByText('Test Child')).toBeInTheDocument();
+  });
+
+  it('should render BtpAccountHeader with correct props', () => {
+    render(<MainLayout>{null}</MainLayout>);
+    expect(screen.getByTestId('currency-dropdown')).toBeInTheDocument();
+  });
+
+  it('should change currency and close sidebar when menu item is selected', () => {
+    const setIsSidebarDisplayed = jest.fn();
+    mockUseHeader.mockReturnValue({
+      ...defaultHeaderValues,
+      isSidebarDisplayed: true,
+      setIsSidebarDisplayed,
+    });
+
+    render(<MainLayout>{null}</MainLayout>);
+
+    fireEvent.click(screen.getByTestId('currency-dropdown'));
+    fireEvent(
+      screen.getByText('USD'),
+      new CustomEvent('rdsMenuItemSelect', { bubbles: true })
+    );
+
+    expect(setIsSidebarDisplayed).toHaveBeenCalledWith(false);
+    expect(defaultHeaderValues.setSelectedCurrency).toHaveBeenCalledWith(47);
+  });
+
+  it('should update date and close sidebar when date is changed', () => {
+    const setAsofDate = jest.fn();
+    mockUseHeader.mockReturnValue({
+      ...defaultHeaderValues,
+      isSidebarDisplayed: true,
+      setIsSidebarDisplayed: jest.fn(),
+      setAsofDate,
+    });
+
+    render(<MainLayout>{null}</MainLayout>);
+
+    const newDate = new Date('2023-01-01');
+    fireEvent(
+      screen.getByTestId('as-of-date-picker'),
+      new CustomEvent('rdsDatePickerChange', {
+        bubbles: true,
+        detail: { newDate },
+      })
+    );
+
+    expect(setAsofDate).toHaveBeenCalledWith(newDate);
+  });
+
+  it('should convert date correctly when passing to BtpAccountHeader', () => {
+    const testDate = new Date('2022-01-01');
+    mockUseHeader.mockReturnValue({
+      ...defaultHeaderValues,
+      asofDate: testDate,
+    });
+
+    render(<MainLayout>{null}</MainLayout>);
+    expect(convertDateToJson).toHaveBeenCalledWith(testDate);
+  });
+
+  it('should add RiskTransfer to SPAs when flag is enabled', () => {
+    jest.spyOn(require('launchdarkly-react-client-sdk'), 'useFlags').mockReturnValue({
+      [RISK_TRANSFER_NAVIGATION_ENABLED]: true,
+    });
+
+    render(<MainLayout>{null}</MainLayout>);
+    // Add assertions for RiskTransfer navigation
+  });
+
+  it('should not show user menu when flag is off', () => {
+    mockFlags({
+      [SHARED_SHOW_USER_MENU_ON_ALL_APPS]: false,
+    });
+
+    render(<MainLayout>{null}</MainLayout>);
+    expect(
+      screen.queryByTestId('btp-product-suite-shared-component-user-menu')
+    ).not.toBeInTheDocument();
+  });
+});
